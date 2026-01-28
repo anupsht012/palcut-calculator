@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { initializeApp } from "firebase/app";
+import  { useState, useEffect } from 'react';
 import {
-  getFirestore,
   doc,
   setDoc,
   onSnapshot,
@@ -15,24 +13,11 @@ import {
   orderBy,
   deleteDoc
 } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
 import { jsPDF } from 'jspdf';
+import { db, GAME_ID } from './firebase/firebaseConfig';
+import { Watermark } from './firebase/myWaterMark/watermark';
 
-// --- FIREBASE CONFIGURATION ---
-const firebaseConfig = {
-  apiKey: "AIzaSyD0Yz56yCb2KiqXMGzL_QwyChWJ8Dg_P0s",
-  authDomain: "palcut-calculator.firebaseapp.com",
-  projectId: "palcut-calculator",
-  storageBucket: "palcut-calculator.firebasestorage.app",
-  messagingSenderId: "989962419105",
-  appId: "1:989962419105:web:873a14a507d4b4099229e0",
-  measurementId: "G-K3627RC8F3"
-};
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
-const GAME_ID = "palcut_live_session";
 
 export type Multiplier = 'Normal' | 'Dedi' | 'Double' | 'Chaubar';
 
@@ -45,13 +30,6 @@ interface Player {
   rejoinCount: number;
   canNoLongerRejoin?: boolean;
 }
-
-// Reusable Watermark component
-const Watermark = () => (
-  <div className="text-center text-slate-400 text-xs font-semibold select-none mt-8 py-4">
-    © Anup Shrestha {new Date().getFullYear()}
-  </div>
-);
 
 const PalCutGame = () => {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -394,7 +372,7 @@ const PalCutGame = () => {
                       const netDisplay = ps.net >= 0
                         ? `+₹${Math.round(ps.net)}`
                         : `-₹${Math.round(Math.abs(ps.net))}`;
-                      const rejoinText = ps.rejoinCount > 0 ? ` (×${ps.rejoinCount} rejoins)` : '';
+                      const rejoinText = ps.rejoinCount > 0 ? ` (+${ps.rejoinCount} rejoins)` : '';
                       doc.text(`${ps.name}${rejoinText} - Score: ${ps.score} - Net: ${netDisplay} (${status})`, 30, y);
                       y += 7;
                     });
@@ -465,7 +443,7 @@ const PalCutGame = () => {
                         {ps.name}
                         {ps.rejoinCount > 0 && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
-                            ×{ps.rejoinCount}
+                            +{ps.rejoinCount}
                           </span>
                         )}
                         <span className="text-xs text-slate-400">({ps.score})</span>
@@ -755,7 +733,7 @@ const PalCutGame = () => {
                   <span className="font-bold text-xl sm:text-2xl truncate">{player.name}</span>
                   {player.rejoinCount > 0 && (
                     <span className="bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                      ×{player.rejoinCount}
+                      +{player.rejoinCount}
                     </span>
                   )}
                 </div>
