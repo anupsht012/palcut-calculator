@@ -34,7 +34,7 @@ const db = getFirestore(app);
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 const GAME_ID = "palcut_live_session"; 
 
-export type Multiplier = 'Normal' | 'Deri' | 'Chaubar' | 'Double';
+export type Multiplier = 'Normal' | 'Deri' | 'Double' | 'Chaubar';
 
 interface Player {
   id: string;
@@ -183,8 +183,8 @@ const PalCutGame = () => {
         } else {
           added = parseInt(roundScores[p.id] || '0');
           if (multiplier === 'Deri') added *= 1.5;
-          if (multiplier === 'Chaubar') added *= 4;
           if (multiplier === 'Double') added *= 2;
+          if (multiplier === 'Chaubar') added *= 4;
         }
 
         const finalPoints = Math.trunc(added);
@@ -701,7 +701,7 @@ const PalCutGame = () => {
         </div>
 
         <div className="flex bg-slate-100/80 backdrop-blur-sm p-1.5 rounded-xl gap-1.5 border border-slate-200">
-          {(['Normal', 'Deri', 'Chaubar', 'Double'] as Multiplier[]).map(m => (
+          {(['Normal', 'Deri', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
             <button
               key={m}
               onClick={() => setMultiplier(m)}
