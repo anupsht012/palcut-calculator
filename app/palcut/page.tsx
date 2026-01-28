@@ -262,6 +262,7 @@ const PalCutGame = () => {
           paid: p.totalPaid,
           net: Math.round(net),
           isWinner: isActive,
+          rejoinCount: p.rejoinCount || 0, // ensure rejoinCount is saved
         };
       });
 
@@ -391,7 +392,8 @@ const PalCutGame = () => {
                       }
                       const status = ps.isWinner ? "Winner" : "Eliminated";
                       const net = ps.isWinner ? `+₹${Math.round(ps.net || 0)}` : `-₹${ps.paid}`;
-                      doc.text(`${ps.name} - Score: ${ps.score} - Net: ${net} (${status})`, 30, y);
+                      const rejoinText = ps.rejoinCount > 0 ? ` (×${ps.rejoinCount} rejoins)` : '';
+                      doc.text(`${ps.name}${rejoinText} - Score: ${ps.score} - Net: ${net} (${status})`, 30, y);
                       y += 7;
                     });
 
@@ -457,8 +459,14 @@ const PalCutGame = () => {
                       key={i} 
                       className="flex justify-between items-center bg-slate-50 p-4 rounded-xl text-sm"
                     >
-                      <span className="text-slate-700 truncate mr-3">
-                        {ps.name} <span className="text-xs text-slate-400">({ps.score})</span>
+                      <span className="text-slate-700 truncate mr-3 flex items-center gap-2">
+                        {ps.name}
+                        {ps.rejoinCount > 0 && (
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+                            ×{ps.rejoinCount}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400">({ps.score})</span>
                       </span>
                       <span className={ps.isWinner ? "text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-lg" : "text-red-600"}>
                         {ps.isWinner ? `+₹${Math.round(ps.net || 0)}` : `-₹${ps.paid}`}
