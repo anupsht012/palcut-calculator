@@ -1,0 +1,64 @@
+
+> palcut@0.1.0 build
+> next build
+
+▲ Next.js 16.1.5 (Turbopack)
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 2 errors:
+./app/palcut/page.tsx:1:27
+Ecmascript file had an error
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m [33mReact[39m[33m,[39m { useState[33m,[39m useEffect } [36mfrom[39m [32m'react'[39m[33m;[39m
+ [90m   |[39m                           [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 2 |[39m [36mimport[39m { initializeApp } [36mfrom[39m [32m"firebase/app"[39m[33m;[39m
+ [90m 3 |[39m [36mimport[39m { 
+ [90m 4 |[39m   getFirestore[33m,[39m [0m
+
+You're importing a component that needs `useEffect`. This React Hook only works in a Client Component. To fix, mark the file (or its parent) with the `"use client"` directive.
+
+ Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/palcut/page.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/palcut/page.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+./app/palcut/page.tsx:1:17
+Ecmascript file had an error
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m [33mReact[39m[33m,[39m { useState[33m,[39m useEffect } [36mfrom[39m [32m'react'[39m[33m;[39m
+ [90m   |[39m                 [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 2 |[39m [36mimport[39m { initializeApp } [36mfrom[39m [32m"firebase/app"[39m[33m;[39m
+ [90m 3 |[39m [36mimport[39m { 
+ [90m 4 |[39m   getFirestore[33m,[39m [0m
+
+You're importing a component that needs `useState`. This React Hook only works in a Client Component. To fix, mark the file (or its parent) with the `"use client"` directive.
+
+ Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/palcut/page.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/palcut/page.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+
+    at <unknown> (./app/palcut/page.tsx:1:27)
+    at <unknown> (./app/palcut/page.tsx:1:17)
