@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import {
   doc,
   setDoc,
@@ -48,8 +49,11 @@ const PalCutGame = () => {
   const [finalPayoutDescription, setFinalPayoutDescription] = useState<string>('');
 
   const [history, setHistory] = useState<any[]>([]);
+  const [cumulativePlayers, setCumulativePlayers] = useState<any[]>([]);
+  const [totalGamesPlayed, setTotalGamesPlayed] = useState<number>(0);
   const [view, setView] = useState<'game' | 'history'>('game');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
   const [frequentNames, setFrequentNames] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -71,6 +75,32 @@ const PalCutGame = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const computeCumulative = (hist: any[]) => {
+    const playerTotals: Record<string, { totalNet: number; totalRejoins: number }> = {};
+
+    hist.forEach((game) => {
+      game.playerStats?.forEach((ps: any) => {
+        if (!playerTotals[ps.name]) {
+          playerTotals[ps.name] = { totalNet: 0, totalRejoins: 0 };
+        }
+        playerTotals[ps.name].totalNet += ps.net || 0;
+        playerTotals[ps.name].totalRejoins += ps.rejoinCount || 0;
+      });
+    });
+
+    const totalGames = hist.length;
+
+    const playersData = Object.entries(playerTotals)
+      .map(([name, data]) => ({
+        name,
+        totalRejoins: data.totalRejoins,
+        profitLoss: Math.round(data.totalNet),
+      }))
+      .sort((a, b) => b.profitLoss - a.profitLoss);
+
+    return { playersData, totalGames };
   };
 
   useEffect(() => {
@@ -101,7 +131,12 @@ const PalCutGame = () => {
         const q = query(collection(db, "history"), orderBy("timestamp", "desc"));
         const querySnapshot = await getDocs(q);
         const historyData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const { playersData, totalGames } = computeCumulative(historyData);
+
         setHistory(historyData);
+        setCumulativePlayers(playersData);
+        setTotalGamesPlayed(totalGames);
         setView('history');
       } catch (error) {
         console.error("Error fetching history:", error);
@@ -152,13 +187,15 @@ const PalCutGame = () => {
     });
   };
 
+
+
   const submitRound = async () => {
     if (!winnerId) {
       alert("Select a winner!");
       return;
     }
 
-    // Save current state before applying changes (for correction/undo)
+    // Normal round
     setPreviousPlayers([...players]);
     setPreviousRoundsPlayed(roundsPlayed);
     setPreviousWinnerId(winnerId);
@@ -197,7 +234,7 @@ const PalCutGame = () => {
       setRoundScores({});
       setWinnerId(null);
       setMultiplier('Normal');
-      setIsEditingLastRound(false); // Reset edit mode after save
+      setIsEditingLastRound(false);
 
       await syncToDb({ players: updatedPlayers, roundsPlayed: nextRoundCount });
     });
@@ -208,7 +245,6 @@ const PalCutGame = () => {
 
     if (!confirm("This will let you edit the last round's winner and scores. Continue?")) return;
 
-    // Restore the state from before the last round was submitted
     setPlayers(previousPlayers);
     setRoundsPlayed(previousRoundsPlayed);
     setWinnerId(previousWinnerId);
@@ -396,9 +432,43 @@ const PalCutGame = () => {
         },
       });
 
-      // @ts-expect-error
-      y = doc.lastAutoTable?.finalY + 12 || y + 12;
+      y = (doc as any).lastAutoTable?.finalY + 12 || y + 12;
     });
+
+    if (cumulativePlayers.length > 0) {
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.text("Overall Player Profit / Loss (All Games)", 105, 20, { align: "center" });
+
+      doc.setFontSize(12);
+      doc.setTextColor(80);
+      doc.text(`Total Games Played: ${totalGamesPlayed}`, 105, 32, { align: "center" });
+
+      autoTable(doc, {
+        startY: 45,
+        margin: { left: 15, right: 15 },
+        head: [['Player', 'Total Rejoins', 'Profit / Loss']],
+        body: cumulativePlayers.map(p => [
+          p.name,
+          p.totalRejoins,
+          p.profitLoss >= 0 ? `+₹${p.profitLoss}` : `-₹${Math.abs(p.profitLoss)}`,
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontSize: 11 },
+        columnStyles: {
+          0: { cellWidth: 90 },
+          1: { cellWidth: 40, halign: 'center' },
+          2: { cellWidth: 60, halign: 'right' },
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const value = data.cell.text[0] as string;
+            data.cell.styles.textColor = value.startsWith('+') ? [34, 197, 94] : [239, 68, 68];
+          }
+        },
+      });
+    }
 
     doc.save(`Palcut_All_Games_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -442,65 +512,113 @@ const PalCutGame = () => {
           ) : history.length === 0 ? (
             <p className="text-center py-16 text-slate-500">No games yet</p>
           ) : (
-            history.map((game) => (
-              <div key={game.id} className="bg-white rounded-xl shadow-sm p-4 sm:p-5 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xl font-bold">🏆 {game.winnerName}</p>
-                      <button
-                        onClick={async () => {
-                          if (confirm("Delete this game?")) {
-                            await withLoading(async () => {
-                              await deleteDoc(doc(db, "history", game.id));
-                              setHistory(history.filter(h => h.id !== game.id));
-                            });
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700 text-xl font-bold"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <p className="text-sm text-slate-500 mt-1">
-                      {game.timestamp?.toDate?.()?.toLocaleString() || '—'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500 uppercase">Pot</p>
-                    <p className="text-2xl font-bold text-emerald-600">₹{game.totalPot}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {game.playerStats?.map((ps: any, i: number) => (
-                    <div
-                      key={i}
-                      className="flex justify-between items-center bg-slate-50 p-3 rounded-lg text-sm"
-                    >
-                      <div>
-                        <span className="font-medium">
-                          {ps.name}
-                          {ps.rejoinCount > 0 && (
-                            <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                              +{ps.rejoinCount}
-                            </span>
-                          )}
-                        </span>
-                        <span className="block text-xs text-slate-500">Score: {ps.score}</span>
+            <>
+              {history.map((game) => (
+                <div key={game.id} className="bg-white rounded-xl shadow-sm p-4 sm:p-5 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-bold">🏆 {game.winnerName}</p>
+                        <button
+                          onClick={async () => {
+                            if (confirm("Delete this game?")) {
+                              await withLoading(async () => {
+                                await deleteDoc(doc(db, "history", game.id));
+                                const newHistory = history.filter(h => h.id !== game.id);
+                                setHistory(newHistory);
+                                const { playersData, totalGames } = computeCumulative(newHistory);
+                                setCumulativePlayers(playersData);
+                                setTotalGamesPlayed(totalGames);
+                              });
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-700 text-xl font-bold"
+                        >
+                          ×
+                        </button>
                       </div>
-                      <span
-                        className={`font-bold px-3 py-1 rounded ${
-                          ps.net >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
-                        }`}
-                      >
-                        {ps.net >= 0 ? `+₹${Math.round(ps.net)}` : `-₹${Math.round(Math.abs(ps.net))}`}
-                      </span>
+                      <p className="text-sm text-slate-500 mt-1">
+                        {game.timestamp?.toDate?.()?.toLocaleString() || '—'}
+                      </p>
                     </div>
-                  ))}
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500 uppercase">Pot</p>
+                      <p className="text-2xl font-bold text-emerald-600">₹{game.totalPot}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {game.playerStats?.map((ps: any, i: number) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-center bg-slate-50 p-3 rounded-lg text-sm"
+                      >
+                        <div>
+                          <span className="font-medium">
+                            {ps.name}
+                            {ps.rejoinCount > 0 && (
+                              <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                +{ps.rejoinCount}
+                              </span>
+                            )}
+                          </span>
+                          <span className="block text-xs text-slate-500">Score: {ps.score}</span>
+                        </div>
+                        <span
+                          className={`font-bold px-3 py-1 rounded ${
+                            ps.net >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
+                          }`}
+                        >
+                          {ps.net >= 0 ? `+₹${Math.round(ps.net)}` : `-₹${Math.round(Math.abs(ps.net))}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+
+              {cumulativePlayers.length > 0 && (
+                <div className="mt-10 bg-white rounded-xl shadow-sm p-5">
+                  <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
+                    Overall Profit / Loss
+                    <span className="text-xs font-normal text-slate-500">(All Games Combined)</span>
+                  </h3>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Total Games Played: <span className="font-bold">{totalGamesPlayed}</span>
+                  </p>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100">
+                          <th className="text-left py-3 px-4 font-medium">Player</th>
+                          <th className="text-center py-3 px-4 font-medium">Total Rejoins</th>
+                          <th className="text-right py-3 px-4 font-medium">Profit / Loss</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cumulativePlayers.map((p, i) => (
+                          <tr key={i} className="border-t hover:bg-slate-50">
+                            <td className="py-3 px-4 font-medium">{p.name}</td>
+                            <td className="py-3 px-4 text-center">{p.totalRejoins}</td>
+                            <td
+                              className={`py-3 px-4 text-right font-bold ${
+                                p.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'
+                              }`}
+                            >
+                              {p.profitLoss >= 0 ? `+₹${p.profitLoss}` : `-₹${Math.abs(p.profitLoss)}`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-4">
+                    Total profit or loss across all completed games (rounded)
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <Watermark />
@@ -587,35 +705,47 @@ const PalCutGame = () => {
               </button>
             </div>
 
-            <div>
-              <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in (₹)</p>
-              <input
-                type="number"
-                value={buyInAmount === 0 ? '' : buyInAmount}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setBuyInAmount(0);
-                    await syncToDb({ buyInAmount: 0 });
-                    return;
-                  }
-                  const num = parseInt(val);
-                  if (!isNaN(num) && num >= 0 && num <= 999) {
-                    setBuyInAmount(num);
-                    await syncToDb({ buyInAmount: num });
-                  }
-                }}
-                onBlur={() => {
-                  if (buyInAmount < 50) {
-                    setBuyInAmount(100);
-                    syncToDb({ buyInAmount: 100 });
-                  }
-                }}
-                placeholder="100"
-                className="w-full p-4 bg-slate-50 border rounded-xl text-center text-xl font-bold focus:border-indigo-500 outline-none"
-              />
-              <p className="text-xs text-slate-500 mt-1">Min ₹50</p>
-            </div>
+           <div>
+  <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in (₹)</p>
+  <input
+  type="number"
+  min={50}
+  max={999}
+  value={buyInAmount}
+  disabled={gameStarted}
+  onChange={async (e) => {
+    const value = Number(e.target.value);
+
+    // Prevent invalid values
+    if (isNaN(value) || value < 50 || value > 999) return;
+
+    // 1. Update state immediately
+    setBuyInAmount(value);
+
+    // 2. Update existing players (before game start)
+    if (!gameStarted) {
+      const updatedPlayers = players.map(p => ({
+        ...p,
+        totalPaid: value,
+      }));
+
+      setPlayers(updatedPlayers);
+
+      // 3. Sync to Firestore
+      await syncToDb({
+        buyInAmount: value,
+        players: updatedPlayers,
+      });
+    }
+  }}
+  className={`w-full p-4 rounded-xl text-center text-xl font-bold
+    ${gameStarted ? 'bg-slate-200 cursor-not-allowed' : 'bg-slate-50'}
+  `}
+/>
+
+
+  <p className="text-xs text-slate-500 mt-1">Min ₹50, Max ₹999</p>
+</div>
 
             {frequentNames.length > 0 && (
               <div>
