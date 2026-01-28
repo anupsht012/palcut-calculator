@@ -2,16 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  onSnapshot, 
-  collection, 
-  addDoc, 
-  getDocs, 
-  serverTimestamp, 
-  query, 
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  onSnapshot,
+  collection,
+  addDoc,
+  getDocs,
+  serverTimestamp,
+  query,
   orderBy,
   deleteDoc
 } from "firebase/firestore";
@@ -32,9 +32,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
-const GAME_ID = "palcut_live_session"; 
+const GAME_ID = "palcut_live_session";
 
-export type Multiplier = 'Normal' | 'Deri' | 'Double' | 'Chaubar';
+export type Multiplier = 'Normal' | 'Dedi' | 'Double' | 'Chaubar';
 
 interface Player {
   id: string;
@@ -182,7 +182,7 @@ const PalCutGame = () => {
           added = 0;
         } else {
           added = parseInt(roundScores[p.id] || '0');
-          if (multiplier === 'Deri') added *= 1.5;
+          if (multiplier === 'Dedi') added *= 1.5;
           if (multiplier === 'Double') added *= 2;
           if (multiplier === 'Chaubar') added *= 4;
         }
@@ -262,7 +262,7 @@ const PalCutGame = () => {
           paid: p.totalPaid,
           net: Math.round(net),
           isWinner: isActive,
-          rejoinCount: p.rejoinCount || 0, // ensure rejoinCount is saved
+          rejoinCount: p.rejoinCount || 0,
         };
       });
 
@@ -343,8 +343,8 @@ const PalCutGame = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
           <h2 className="text-2xl font-bold text-slate-800">Game History</h2>
           <div className="flex items-center gap-3 flex-wrap">
-            <button 
-              onClick={() => setView('game')} 
+            <button
+              onClick={() => setView('game')}
               className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-slate-700 transition-colors"
             >
               Back to Game
@@ -372,7 +372,7 @@ const PalCutGame = () => {
 
                     doc.setFontSize(14);
                     doc.setTextColor(0);
-                    doc.text(`Game ${index + 1} - ${game.timestamp?.toDate?.().toLocaleDateString() || 'Unknown Date'}`, 20, y);
+                    doc.text(`Game ${index + 1} - ${game.timestamp?.toDate?.()?.toLocaleDateString() || 'Unknown Date'}`, 20, y);
                     y += 10;
 
                     doc.setFontSize(12);
@@ -391,9 +391,11 @@ const PalCutGame = () => {
                         y = 20;
                       }
                       const status = ps.isWinner ? "Winner" : "Eliminated";
-                      const net = ps.isWinner ? `+₹${Math.round(ps.net || 0)}` : `-₹${ps.paid}`;
+                      const netDisplay = ps.net >= 0
+                        ? `+₹${Math.round(ps.net)}`
+                        : `-₹${Math.round(Math.abs(ps.net))}`;
                       const rejoinText = ps.rejoinCount > 0 ? ` (×${ps.rejoinCount} rejoins)` : '';
-                      doc.text(`${ps.name}${rejoinText} - Score: ${ps.score} - Net: ${net} (${status})`, 30, y);
+                      doc.text(`${ps.name}${rejoinText} - Score: ${ps.score} - Net: ${netDisplay} (${status})`, 30, y);
                       y += 7;
                     });
 
@@ -444,7 +446,7 @@ const PalCutGame = () => {
                       </button>
                     </div>
                     <p className="text-sm text-slate-500">
-                      {game.timestamp?.toDate?.().toLocaleString() || '—'}
+                      {game.timestamp?.toDate?.()?.toLocaleString() || '—'}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
@@ -455,8 +457,8 @@ const PalCutGame = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {game.playerStats?.map((ps: any, i: number) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="flex justify-between items-center bg-slate-50 p-4 rounded-xl text-sm"
                     >
                       <span className="text-slate-700 truncate mr-3 flex items-center gap-2">
@@ -468,8 +470,16 @@ const PalCutGame = () => {
                         )}
                         <span className="text-xs text-slate-400">({ps.score})</span>
                       </span>
-                      <span className={ps.isWinner ? "text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-lg" : "text-red-600"}>
-                        {ps.isWinner ? `+₹${Math.round(ps.net || 0)}` : `-₹${ps.paid}`}
+                      <span
+                        className={`font-bold px-3 py-1 rounded-lg ${
+                          ps.net >= 0
+                            ? "text-emerald-600 bg-emerald-50"
+                            : "text-red-600 bg-red-50"
+                        }`}
+                      >
+                        {ps.net >= 0
+                          ? `+₹${Math.round(ps.net)}`
+                          : `-₹${Math.round(Math.abs(ps.net))}`}
                       </span>
                     </div>
                   ))}
@@ -502,14 +512,14 @@ const PalCutGame = () => {
               <p className="text-emerald-300 text-lg sm:text-xl font-bold mb-6">
                 Pot: ₹{finalPotAmount}
               </p>
-              
+
               <div className="space-y-3">
                 {finalStats.map((p, i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     className={`flex justify-between items-center p-4 rounded-xl text-sm ${
-                      p.isWinner 
-                        ? 'bg-emerald-600/20 border border-emerald-500/50' 
+                      p.isWinner
+                        ? 'bg-emerald-600/20 border border-emerald-500/50'
                         : 'bg-white/10 border border-white/10'
                     }`}
                   >
@@ -519,7 +529,9 @@ const PalCutGame = () => {
                     </div>
                     <div className="text-right">
                       <p className={`font-bold ${p.net >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-                        {p.net >= 0 ? `+₹${p.net}` : `₹${p.net}`}
+                        {p.net >= 0
+                          ? `+₹${Math.round(p.net)}`
+                          : `-₹${Math.round(Math.abs(p.net))}`}
                       </p>
                     </div>
                   </div>
@@ -527,7 +539,7 @@ const PalCutGame = () => {
               </div>
             </div>
           )}
-          <button 
+          <button
             onClick={handleStartNewGame}
             className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition-all active:scale-95 mt-6"
           >
@@ -543,13 +555,13 @@ const PalCutGame = () => {
     return (
       <div className="max-w-lg mx-auto mt-6 sm:mt-10 px-3 sm:px-0 min-h-screen flex flex-col items-center">
         {isLoading && LoaderOverlay}
-        
+
         {/* Main content box */}
         <div className="w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-8 space-y-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-800">Palcut Calculator</h2>
-            <button 
-              onClick={fetchHistory} 
+            <button
+              onClick={fetchHistory}
               className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-indigo-100 transition-colors"
             >
               History
@@ -563,8 +575,8 @@ const PalCutGame = () => {
               placeholder="Player name"
               className="flex-1 p-4 bg-slate-50 border-2 border-transparent rounded-xl outline-none focus:border-indigo-500 focus:bg-white font-medium text-base transition-all"
             />
-            <button 
-              onClick={() => addPlayer()} 
+            <button
+              onClick={() => addPlayer()}
               className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-sm hover:bg-indigo-700 active:scale-95 transition-all"
             >
               Add
@@ -618,8 +630,8 @@ const PalCutGame = () => {
               <div className="flex flex-wrap gap-2">
                 {frequentNames.map(name => (
                   <div key={name} className="flex items-center bg-slate-100 hover:bg-slate-200 rounded-full px-4 py-1.5 gap-2 transition-colors text-sm">
-                    <button 
-                      onClick={() => addPlayer(name)} 
+                    <button
+                      onClick={() => addPlayer(name)}
                       className="font-medium text-slate-700"
                     >
                       + {name}
@@ -647,8 +659,8 @@ const PalCutGame = () => {
             {players.map(p => (
               <div key={p.id} className="p-4 bg-slate-50 rounded-xl flex justify-between items-center text-sm">
                 <span className="font-bold text-slate-800">{p.name}</span>
-                <button 
-                  onClick={() => removePlayer(p.id)} 
+                <button
+                  onClick={() => removePlayer(p.id)}
                   className="text-red-500 hover:text-red-700 font-bold text-xs uppercase"
                 >
                   Remove
@@ -657,15 +669,15 @@ const PalCutGame = () => {
             ))}
           </div>
 
-          <button 
-            onClick={() => withLoading(async () => { 
-              setGameStarted(true); 
-              await syncToDb({ gameStarted: true }); 
-            })} 
-            disabled={players.length < 2} 
+          <button
+            onClick={() => withLoading(async () => {
+              setGameStarted(true);
+              await syncToDb({ gameStarted: true });
+            })}
+            disabled={players.length < 2}
             className={`w-full py-5 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 ${
-              players.length < 2 
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+              players.length < 2
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
             }`}
           >
@@ -709,14 +721,14 @@ const PalCutGame = () => {
         </div>
 
         <div className="flex bg-slate-100/80 backdrop-blur-sm p-1.5 rounded-xl gap-1.5 border border-slate-200">
-          {(['Normal', 'Deri', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
+          {(['Normal', 'Dedi', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
             <button
               key={m}
               onClick={() => setMultiplier(m)}
               className={`
                 flex-1 py-3 sm:py-4 rounded-lg font-bold text-xs sm:text-sm uppercase transition-all duration-200
-                ${multiplier === m 
-                  ? 'bg-white text-indigo-700 shadow-md scale-[1.02]' 
+                ${multiplier === m
+                  ? 'bg-white text-indigo-700 shadow-md scale-[1.02]'
                   : 'text-slate-600 hover:text-slate-800 hover:bg-white/60'
                 }
               `}
@@ -732,8 +744,8 @@ const PalCutGame = () => {
               key={player.id}
               className={`
                 p-4 sm:p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col gap-4 text-sm
-                ${player.isOut 
-                  ? 'bg-red-50 border-red-200 opacity-75' 
+                ${player.isOut
+                  ? 'bg-red-50 border-red-200 opacity-75'
                   : 'bg-white border-slate-200 shadow-sm hover:border-indigo-200'
                 }
               `}
@@ -763,8 +775,8 @@ const PalCutGame = () => {
                       className={`
                         w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-3xl shrink-0
                         transition-all active:scale-95
-                        ${winnerId === player.id 
-                          ? 'bg-yellow-400 shadow-xl border-2 border-yellow-500' 
+                        ${winnerId === player.id
+                          ? 'bg-yellow-400 shadow-xl border-2 border-yellow-500'
                           : 'bg-slate-100 border-2 border-slate-200 hover:bg-slate-200'
                         }
                       `}
@@ -817,8 +829,8 @@ const PalCutGame = () => {
             disabled={!winnerId}
             className={`
               flex-1 py-5 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95
-              ${winnerId 
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+              ${winnerId
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                 : 'bg-slate-300 text-slate-500 cursor-not-allowed'
               }
             `}
