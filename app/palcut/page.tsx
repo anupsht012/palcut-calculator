@@ -54,6 +54,14 @@ const PalCutGame = () => {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // States for editing / correcting last round
+  const [previousPlayers, setPreviousPlayers] = useState<Player[] | null>(null);
+  const [previousRoundsPlayed, setPreviousRoundsPlayed] = useState<number | null>(null);
+  const [previousWinnerId, setPreviousWinnerId] = useState<string | null>(null);
+  const [previousRoundScores, setPreviousRoundScores] = useState<Record<string, string>>({});
+  const [previousMultiplier, setPreviousMultiplier] = useState<Multiplier>('Normal');
+  const [isEditingLastRound, setIsEditingLastRound] = useState(false);
+
   const withLoading = async (fn: () => Promise<void>) => {
     setIsLoading(true);
     try {
@@ -150,6 +158,13 @@ const PalCutGame = () => {
       return;
     }
 
+    // Save current state before applying changes (for correction/undo)
+    setPreviousPlayers([...players]);
+    setPreviousRoundsPlayed(roundsPlayed);
+    setPreviousWinnerId(winnerId);
+    setPreviousRoundScores({ ...roundScores });
+    setPreviousMultiplier(multiplier);
+
     await withLoading(async () => {
       const updatedPlayers = players.map(p => {
         if (p.canNoLongerRejoin) return p;
@@ -182,9 +197,24 @@ const PalCutGame = () => {
       setRoundScores({});
       setWinnerId(null);
       setMultiplier('Normal');
+      setIsEditingLastRound(false); // Reset edit mode after save
 
       await syncToDb({ players: updatedPlayers, roundsPlayed: nextRoundCount });
     });
+  };
+
+  const startCorrectLastRound = () => {
+    if (!previousPlayers || previousRoundsPlayed === null) return;
+
+    if (!confirm("This will let you edit the last round's winner and scores. Continue?")) return;
+
+    // Restore the state from before the last round was submitted
+    setPlayers(previousPlayers);
+    setRoundsPlayed(previousRoundsPlayed);
+    setWinnerId(previousWinnerId);
+    setRoundScores(previousRoundScores);
+    setMultiplier(previousMultiplier);
+    setIsEditingLastRound(true);
   };
 
   const rejoin = async (id: string) => {
@@ -379,9 +409,6 @@ const PalCutGame = () => {
     </div>
   );
 
-  // ────────────────────────────────────────────────
-  //                  HISTORY VIEW
-  // ────────────────────────────────────────────────
   if (view === 'history') {
     return (
       <div className="h-screen w-screen overflow-y-auto bg-slate-50">
@@ -416,7 +443,7 @@ const PalCutGame = () => {
             <p className="text-center py-16 text-slate-500">No games yet</p>
           ) : (
             history.map((game) => (
-              <div key={game.id} className="bg-white rounded-xl  shadow-sm p-4 sm:p-5 space-y-4">
+              <div key={game.id} className="bg-white rounded-xl shadow-sm p-4 sm:p-5 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
@@ -482,9 +509,6 @@ const PalCutGame = () => {
     );
   }
 
-  // ────────────────────────────────────────────────
-  //                  SUMMARY / FINISH SCREEN
-  // ────────────────────────────────────────────────
   if (showSummary) {
     return (
       <div className="h-screen w-screen overflow-y-auto bg-slate-50">
@@ -532,9 +556,6 @@ const PalCutGame = () => {
     );
   }
 
-  // ────────────────────────────────────────────────
-  //                  SETUP SCREEN (before game start)
-  // ────────────────────────────────────────────────
   if (!gameStarted) {
     return (
       <div className="h-screen w-screen overflow-y-auto bg-slate-50">
@@ -663,9 +684,6 @@ const PalCutGame = () => {
     );
   }
 
-  // ────────────────────────────────────────────────
-  //                  MAIN GAME SCREEN
-  // ────────────────────────────────────────────────
   return (
     <div className="h-screen w-screen overflow-y-auto bg-slate-50">
       {isLoading && LoaderOverlay}
@@ -697,16 +715,16 @@ const PalCutGame = () => {
           </div>
         </div>
 
-        {/* Multiplier selector */}
-       <div className="flex bg-slate-100/80 backdrop-blur-sm p-1.5 rounded-xl gap-1.5 border border-slate-200">
+        {/* Compact Multiplier selector */}
+        <div className="flex bg-slate-100/80 backdrop-blur-sm p-1 rounded-xl gap-1 border border-slate-200">
           {(['Normal', 'Dedi', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
             <button
               key={m}
               onClick={() => setMultiplier(m)}
               className={`
-                flex-1 py-4 sm:py-5 rounded-lg font-bold text-sm sm:text-base uppercase transition-all duration-200
+                flex-1 py-3 sm:py-3.5 rounded-lg font-medium text-sm transition-all duration-200
                 ${multiplier === m
-                  ? 'bg-white text-indigo-700 shadow-md scale-[1.02]'
+                  ? 'bg-white text-indigo-700 shadow-md scale-[1.05]'
                   : 'text-slate-600 hover:text-slate-800 hover:bg-white/60'
                 }
               `}
@@ -721,8 +739,8 @@ const PalCutGame = () => {
           {players.map(player => (
             <div
               key={player.id}
-              className={`rounded-xl border p-4 ${
-                player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white border-slate-200'
+              className={`rounded-xl border border-slate-200 p-4 ${
+                player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white'
               }`}
             >
               <div className="flex justify-between items-center mb-3">
@@ -787,7 +805,7 @@ const PalCutGame = () => {
           ))}
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons + correction button */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <button
             onClick={submitRound}
@@ -798,7 +816,7 @@ const PalCutGame = () => {
                 : 'bg-slate-300 text-slate-500 cursor-not-allowed'
             }`}
           >
-            SUBMIT ROUND
+            {isEditingLastRound ? "SAVE CORRECTION" : "SUBMIT ROUND"}
           </button>
 
           {roundsPlayed >= 1 && (
@@ -810,6 +828,15 @@ const PalCutGame = () => {
             </button>
           )}
         </div>
+
+        {roundsPlayed >= 1 && !isEditingLastRound && previousPlayers && (
+          <button
+            onClick={startCorrectLastRound}
+            className="w-full py-3 mt-2 text-sm font-medium text-orange-600 hover:text-orange-800 bg-orange-50 rounded-xl border border-orange-200 transition-colors"
+          >
+            ✏️ Correct Last Round
+          </button>
+        )}
 
         <button
           onClick={resetLiveGame}
