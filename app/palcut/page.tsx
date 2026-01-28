@@ -14,7 +14,6 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
-import { debounce } from 'lodash';  // ← Add this import (npm install lodash if not already)
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -66,10 +65,8 @@ const PalCutGame = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [frequentNames, setFrequentNames] = useState<string[]>([]);
 
-  // Debounced Firestore sync for buy-in amount
-  const debouncedSyncBuyIn = debounce((value: number) => {
-    syncToDb({ buyInAmount: value });
-  }, 600);
+ 
+  
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "games", GAME_ID), (docSnap) => {
@@ -434,7 +431,7 @@ const PalCutGame = () => {
           </button>
         </div>
 
-        {/* Buy-in amount input with optimistic + debounced update */}
+        {/* Buy-in amount input with optimistic  */}
         <div className="mb-8">
           <p className="text-sm font-black text-slate-600 uppercase mb-3 tracking-widest">Buy-in / Rejoin Amount (₹)</p>
           <input
@@ -446,7 +443,7 @@ const PalCutGame = () => {
               const val = parseInt(e.target.value);
               if (!isNaN(val) && val >= 50) {
                 setBuyInAmount(val);           // Instant local UI update
-                debouncedSyncBuyIn(val);       // Debounced Firestore write
+                      
               }
             }}
             className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-indigo-500 focus:bg-white font-bold text-lg transition-all text-center"
