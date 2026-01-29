@@ -934,7 +934,11 @@ const PalCutGame = () => {
             </div>
           ))}
         </div>
-
+{isEditingLastRound && (
+  <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-center text-sm">
+    ⚠️ Editing last round — changes will be saved when you click SAVE CORRECTION
+  </div>
+)}
         {/* Action buttons + correction button */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <button
