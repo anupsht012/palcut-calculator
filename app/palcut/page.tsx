@@ -47,6 +47,7 @@ const PalCutGame = () => {
   const [multiplier, setMultiplier] = useState<Multiplier>('Normal');
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [buyInAmount, setBuyInAmount] = useState<number>(100);
+  const [buyInInput, setBuyInInput] = useState<string>(buyInAmount.toString());
 
   const [finalWinnerName, setFinalWinnerName] = useState('');
   const [finalPotAmount, setFinalPotAmount] = useState(0);
@@ -97,6 +98,11 @@ const PalCutGame = () => {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    // Keep the input string in sync with the numeric buy-in amount
+    setBuyInInput(buyInAmount.toString());
+  }, [buyInAmount]);
+
   const createNewRoom = () => {
     const newCode = Math.random().toString(36).slice(2, 8).toUpperCase();
     setRoomCode(newCode);
@@ -129,7 +135,6 @@ const PalCutGame = () => {
         setRoundsPlayed(data.roundsPlayed || 0);
         setBuyInAmount(data.buyInAmount || 100);
       } else {
-        // Create new room document with expireAt = now + 10 minutes
         setDoc(gameRef, {
           players: [],
           gameStarted: false,
@@ -137,7 +142,7 @@ const PalCutGame = () => {
           buyInAmount: 100,
           createdAt: serverTimestamp(),
           lastActive: serverTimestamp(),
-          expireAt: Timestamp.fromMillis(Date.now() + 24 *60 * 60 * 1000), // 10 minutes TTL window
+          expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
         }).catch(console.error);
       }
     }, (err) => {
@@ -151,11 +156,10 @@ const PalCutGame = () => {
     if (!roomCode) return;
     const gameRef = doc(db, "games", roomCode);
 
-    // Always refresh expireAt on write → extends TTL by 10 minutes
     const extendedUpdates = {
       ...updates,
       lastActive: serverTimestamp(),
-      expireAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
+      expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
     };
 
     try {
@@ -282,6 +286,15 @@ const PalCutGame = () => {
       return;
     }
 
+    // Check for direct win condition
+    const activeNonWinners = players.filter(p => !p.isOut && p.id !== winnerId);
+    const allOthersEmpty = activeNonWinners.every(p => {
+      const scoreStr = roundScores[p.id];
+      return !scoreStr || scoreStr.trim() === '' || scoreStr === '0';
+    });
+
+    const isDirectWin = activeNonWinners.length > 0 && allOthersEmpty;
+
     setPreviousPlayers([...players]);
     setPreviousRoundsPlayed(roundsPlayed);
     setPreviousWinnerId(winnerId);
@@ -289,40 +302,58 @@ const PalCutGame = () => {
     setPreviousMultiplier(multiplier);
 
     await withLoading(async () => {
-      const updatedPlayers = players.map(p => {
-        if (p.canNoLongerRejoin) return p;
-        if (p.isOut) return { ...p, canNoLongerRejoin: true };
+      let updatedPlayers = [...players];
 
-        let added = 0;
-        if (p.id === winnerId) {
-          added = 0;
-        } else {
-          added = parseInt(roundScores[p.id] || '0');
-          if (multiplier === 'Dedi') added *= 1.5;
-          if (multiplier === 'Double') added *= 2;
-          if (multiplier === 'Chaubar') added *= 4;
-        }
+     if (isDirectWin) {
+  updatedPlayers = updatedPlayers.map(p => {
+    if (p.id === winnerId) return { ...p };
+    if (!p.isOut) {
+      return { ...p, cumulativeScore: 100, isOut: true };
+    }
+    return p;
+  });
 
-        const finalPoints = Math.round(added);
-        const newScore = p.cumulativeScore + finalPoints;
-        const isNowOut = newScore >= 100;
+  setPlayers(updatedPlayers);
+  setRoundsPlayed(roundsPlayed + 1);
+  await syncToDb({ players: updatedPlayers, roundsPlayed: roundsPlayed + 1 });
 
-        return {
-          ...p,
-          cumulativeScore: newScore,
-          isOut: isNowOut,
-        };
-      });
+  await handleFinishGame(true, winnerId);
+} else {
+        // Normal scoring
+        updatedPlayers = players.map(p => {
+          if (p.canNoLongerRejoin) return p;
+          if (p.isOut) return { ...p, canNoLongerRejoin: true };
 
-      const nextRoundCount = roundsPlayed + 1;
-      setPlayers(updatedPlayers);
-      setRoundsPlayed(nextRoundCount);
+          let added = 0;
+          if (p.id === winnerId) {
+            added = 0;
+          } else {
+            added = parseInt(roundScores[p.id] || '0', 10) || 0;
+            if (multiplier === 'Dedi') added = Math.round(added * 1.5);
+            if (multiplier === 'Double') added *= 2;
+            if (multiplier === 'Chaubar') added *= 4;
+          }
+
+          const newScore = p.cumulativeScore + added;
+          const isNowOut = newScore >= 100;
+
+          return {
+            ...p,
+            cumulativeScore: newScore,
+            isOut: isNowOut,
+          };
+        });
+
+        const nextRoundCount = roundsPlayed + 1;
+        setPlayers(updatedPlayers);
+        setRoundsPlayed(nextRoundCount);
+        await syncToDb({ players: updatedPlayers, roundsPlayed: nextRoundCount });
+      }
+
       setRoundScores({});
       setWinnerId(null);
       setMultiplier('Normal');
       setIsEditingLastRound(false);
-
-      await syncToDb({ players: updatedPlayers, roundsPlayed: nextRoundCount });
     });
   };
 
@@ -358,7 +389,8 @@ const PalCutGame = () => {
     });
   };
 
-  const handleFinishGame = async () => {
+  const handleFinishGame = async (isDirectWin: boolean = false, directWinnerId?: string) => {
+    
     if (!confirm("Finish game and save results?")) return;
 
     await withLoading(async () => {
@@ -367,34 +399,59 @@ const PalCutGame = () => {
 
       let payoutDescription = '';
       let winnerDisplay = '';
+      let stats: any[] = [];
 
-      if (activeCount === 0) {
-        payoutDescription = 'No winners (all eliminated)';
-        winnerDisplay = '—';
-      } else if (activeCount === 1) {
-        payoutDescription = 'Full Winner (last remaining)';
-        winnerDisplay = activePlayers[0].name;
-      } else {
-        payoutDescription = `Split equally among ${activeCount} remaining players`;
-        winnerDisplay = activePlayers.map(p => p.name).join(', ');
+     if (isDirectWin && directWinnerId) {
+  const winner = players.find(p => p.id === directWinnerId)!;
+
+  payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
+  winnerDisplay = winner.name;
+
+  stats = players.map(p => {
+    const isWinner = p.id === directWinnerId;
+
+    return {
+      name: p.name,
+      score: p.cumulativeScore,
+      paid: p.totalPaid,
+      net: isWinner
+        ? Math.round(totalPot - p.totalPaid)
+        : -p.totalPaid,
+      isWinner,
+      rejoinCount: p.rejoinCount || 0,
+    };
+  });
+}
+else {
+        // Normal finish
+        if (activeCount === 0) {
+          payoutDescription = 'No winners (all eliminated)';
+          winnerDisplay = '—';
+        } else if (activeCount === 1) {
+          payoutDescription = 'Full Winner (last remaining)';
+          winnerDisplay = activePlayers[0].name;
+        } else {
+          payoutDescription = `Split equally among ${activeCount} remaining players`;
+          winnerDisplay = activePlayers.map(p => p.name).join(', ');
+        }
+
+        const sharePerWinner = activeCount > 0 ? totalPot / activeCount : 0;
+
+        stats = players.map(p => {
+          const isActive = !p.isOut;
+          let net = -p.totalPaid;
+          if (isActive) net += sharePerWinner;
+
+          return {
+            name: p.name,
+            score: p.cumulativeScore,
+            paid: p.totalPaid,
+            net: Math.round(net),
+            isWinner: isActive,
+            rejoinCount: p.rejoinCount || 0,
+          };
+        });
       }
-
-      const sharePerWinner = activeCount > 0 ? totalPot / activeCount : 0;
-
-      const stats = players.map(p => {
-        const isActive = !p.isOut;
-        let net = -p.totalPaid;
-        if (isActive) net += sharePerWinner;
-
-        return {
-          name: p.name,
-          score: p.cumulativeScore,
-          paid: p.totalPaid,
-          net: Math.round(net),
-          isWinner: isActive,
-          rejoinCount: p.rejoinCount || 0,
-        };
-      });
 
       // Save completed game to subcollection
       await addDoc(collection(db, "games", roomCode!, "completedGames"), {
@@ -405,6 +462,7 @@ const PalCutGame = () => {
         activeWinnersCount: activeCount,
         timestamp: serverTimestamp(),
         playerStats: stats,
+        isDirectWin,
       });
 
       const resetPlayers = players.map(p => ({
@@ -416,7 +474,6 @@ const PalCutGame = () => {
         canNoLongerRejoin: false
       }));
 
-      // Reset main game document (also refreshes expireAt via syncToDb)
       await syncToDb({
         players: resetPlayers,
         gameStarted: false,
@@ -567,14 +624,17 @@ const PalCutGame = () => {
     </div>
   );
 
-  // Room selection screen
+  // ──────────────────────────────────────────────────────────────
+  //                           RENDER
+  // ──────────────────────────────────────────────────────────────
+
   if (!authReady || !roomCode) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 space-y-8">
           <div className="text-center">
             <h1 className="text-4xl font-extrabold text-slate-800">Palcut</h1>
-            <p className="mt-2 text-slate-600">Score Calculator for Friends</p>
+            <p className="mt-2 text-lg text-slate-600">Score Calculator for Friends</p>
             <p className="mt-1 text-sm text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
           </div>
 
@@ -600,7 +660,7 @@ const PalCutGame = () => {
                 value={joiningCode}
                 onChange={(e) => setJoiningCode(e.target.value.toUpperCase())}
                 placeholder="Enter room code (e.g. X7P4Q9)"
-                className="w-full p-5 text-center text-2xl font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
+                className="w-full p-5 text-center text-md font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
                 maxLength={8}
                 onKeyDown={(e) => e.key === 'Enter' && joinRoom()}
               />
@@ -667,6 +727,11 @@ const PalCutGame = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-xl font-bold">🏆 {game.winnerName}</p>
+                        {game.isDirectWin && (
+                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                            Direct
+                          </span>
+                        )}
                         <button
                           onClick={async () => {
                             if (confirm("Delete this game record?")) {
@@ -875,31 +940,29 @@ const PalCutGame = () => {
                 type="number"
                 min={50}
                 max={999}
-                value={buyInAmount}
-                disabled={gameStarted}
-                onChange={async (e) => {
-                  const value = Number(e.target.value);
-                  if (isNaN(value) || value < 50 || value > 999) return;
+                value={buyInInput}
+                onChange={(e) => setBuyInInput(e.target.value)}
+                onBlur={async () => {
+                  const value = parseInt(buyInInput, 10);
+                  if (isNaN(value) || value < 50 || value > 999) {
+                    setBuyInInput(buyInAmount.toString());
+                    return;
+                  }
 
-                  setBuyInAmount(value);
-
-                  if (!gameStarted) {
+                  if (value !== buyInAmount) {
+                    setBuyInAmount(value);
                     const updatedPlayers = players.map(p => ({
                       ...p,
                       totalPaid: value,
                     }));
-
                     setPlayers(updatedPlayers);
-
                     await syncToDb({
                       buyInAmount: value,
                       players: updatedPlayers,
                     });
                   }
                 }}
-                className={`w-full p-4 rounded-xl text-center text-xl font-bold
-                  ${gameStarted ? 'bg-slate-200 cursor-not-allowed' : 'bg-slate-50'}
-                `}
+                className="w-full p-4 rounded-xl text-center text-xl font-bold bg-slate-50"
               />
               <p className="text-xs text-slate-500 mt-1">Min ₹50, Max ₹999</p>
             </div>
@@ -970,6 +1033,12 @@ const PalCutGame = () => {
       </div>
     );
   }
+
+  const activeNonWinners = players.filter(p => !p.isOut && p.id !== winnerId);
+  const isDirectWinPossible = winnerId && activeNonWinners.length > 0 && activeNonWinners.every(p => {
+    const v = roundScores[p.id];
+    return !v || v.trim() === '' || v === '0';
+  });
 
   return (
     <div className="h-screen w-screen overflow-y-auto bg-slate-50">
@@ -1042,6 +1111,13 @@ const PalCutGame = () => {
           ))}
         </div>
 
+        {/* Direct win hint */}
+        {isDirectWinPossible && (
+          <div className="bg-amber-50 border border-amber-300 text-amber-800 p-3 rounded-xl text-center text-sm">
+            All others have 0 points → winner takes full pot (entry not refunded)
+          </div>
+        )}
+
         {/* Players List */}
         <div className="space-y-4">
           {players.map(player => (
@@ -1093,7 +1169,7 @@ const PalCutGame = () => {
                         }
                       }}
                       className="w-28 p-3 text-center text-2xl font-bold bg-slate-50 border rounded-lg focus:border-indigo-500 outline-none"
-                      placeholder="0"
+                      placeholder=""
                     />
                   </div>
                 ) : player.canNoLongerRejoin ? (
@@ -1123,18 +1199,24 @@ const PalCutGame = () => {
           <button
             onClick={submitRound}
             disabled={!winnerId}
-            className={`flex-1 py-4 rounded-xl font-bold text-lg ${
+            className={`flex-1 py-4 rounded-xl font-bold text-lg transition-colors ${
               winnerId
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                ? isDirectWinPossible
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-slate-300 text-slate-500 cursor-not-allowed'
             }`}
           >
-            {isEditingLastRound ? "SAVE CORRECTION" : "SUBMIT ROUND"}
+            {isEditingLastRound
+              ? "SAVE CORRECTION"
+              : isDirectWinPossible
+              ? "DECLARE WINNER & FINISH"
+              : "SUBMIT ROUND"}
           </button>
 
           {roundsPlayed >= 1 && (
             <button
-              onClick={handleFinishGame}
+              onClick={() => handleFinishGame(false)}
               className="flex-1 sm:flex-none sm:w-44 py-4 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700"
             >
               FINISH GAME
