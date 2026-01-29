@@ -11,7 +11,7 @@ export const Watermark = () => {
 
   return (
     <div className="text-center text-slate-400 text-xs font-semibold select-none mt-8 py-4">
-      © Anup Shrestha {year || '2024'}
+     Made with ❤️ in thimi • Palcut v1.0 © Anup Shrestha {year || '2024'}
     </div>
   );
 };
