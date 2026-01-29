@@ -589,27 +589,54 @@ else {
       doc.setTextColor(80);
       doc.text(`Total Games Played: ${totalGamesPlayed}`, 105, 32, { align: "center" });
 
+      const allPlayers = Array.from(new Set(history.flatMap((g: any) => g.playerStats.map((ps: any) => ps.name)))).sort();
+
+      const head = [['Game', ...allPlayers]];
+
+      const body = history.slice().reverse().map((game: any, i: number) => {
+        const row = [(i + 1).toString()];
+        allPlayers.forEach((name: string) => {
+          const ps = game.playerStats.find((p: any) => p.name === name);
+          const net = ps ? ps.net : 0;
+          const rejoins = ps ? ps.rejoinCount : 0;
+          const text = net >= 0 ? `+₹${Math.round(net)} +${rejoins}` : `-₹${Math.round(Math.abs(net))} +${rejoins}`;
+          row.push(text);
+        });
+        return row;
+      });
+
+      const totalRow = ['TOTAL'];
+      allPlayers.forEach((name: string) => {
+        const totalNet = history.reduce((sum: number, g: any) => {
+          const ps = g.playerStats.find((p: any) => p.name === name);
+          return sum + (ps ? ps.net : 0);
+        }, 0);
+        const totalRejoins = history.reduce((sum: number, g: any) => {
+          const ps = g.playerStats.find((p: any) => p.name === name);
+          return sum + (ps ? ps.rejoinCount : 0);
+        }, 0);
+        const text = totalNet >= 0 ? `+₹${Math.round(totalNet)} +${totalRejoins}` : `-₹${Math.round(Math.abs(totalNet))} +${totalRejoins}`;
+        totalRow.push(text);
+      });
+      body.push(totalRow);
+
       autoTable(doc, {
         startY: 45,
         margin: { left: 15, right: 15 },
-        head: [['Player', 'Total Rejoins', 'Profit / Loss']],
-        body: cumulativePlayers.map(p => [
-          p.name,
-          p.totalRejoins,
-          p.profitLoss >= 0 ? `+₹${p.profitLoss}` : `-₹${Math.abs(p.profitLoss)}`,
-        ]),
+        head,
+        body,
         theme: 'grid',
-        styles: { fontSize: 10, cellPadding: 4 },
-        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontSize: 11 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontSize: 9 },
         columnStyles: {
-          0: { cellWidth: 90 },
-          1: { cellWidth: 40, halign: 'center' },
-          2: { cellWidth: 60, halign: 'right' },
+          0: { cellWidth: 20 },
         },
         didParseCell: (data) => {
-          if (data.section === 'body' && data.column.index === 2) {
+          if (data.section === 'body' && data.column.index > 0) {
             const value = data.cell.text[0] as string;
-            data.cell.styles.textColor = value.startsWith('+') ? [34, 197, 94] : [239, 68, 68];
+            if (value && (value.startsWith('+') || value.startsWith('-'))) {
+              data.cell.styles.textColor = value.startsWith('+') ? [34, 197, 94] : [239, 68, 68];
+            }
           }
         },
       });
@@ -641,7 +668,7 @@ else {
           <div className="space-y-6">
             <button
               onClick={createNewRoom}
-              className="w-full py-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xl rounded-xl shadow-lg transition transform hover:scale-105"
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xl rounded-xl shadow-lg transition transform hover:scale-105"
             >
               Start New Table
             </button>
@@ -660,14 +687,14 @@ else {
                 value={joiningCode}
                 onChange={(e) => setJoiningCode(e.target.value.toUpperCase())}
                 placeholder="Enter room code (e.g. X7P4Q9)"
-                className="w-full p-5 text-center text-md font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
+                className="w-full p-4 text-center text-md font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
                 maxLength={8}
                 onKeyDown={(e) => e.key === 'Enter' && joinRoom()}
               />
               <button
                 onClick={joinRoom}
                 disabled={joiningCode.trim().length < 4}
-                className={`w-full py-5 font-bold text-xl rounded-xl transition ${
+                className={`w-full py-4 font-bold text-xl rounded-xl transition ${
                   joiningCode.trim().length >= 4
                     ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
@@ -789,40 +816,70 @@ else {
                   </div>
                 </div>
               ))}
-
-              {cumulativePlayers.length > 0 && (
+              {history.length > 0 && (
                 <div className="mt-10 bg-white rounded-xl shadow-sm p-5">
                   <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
                     Overall Profit / Loss
                     <span className="text-xs font-normal text-slate-500">(This Room)</span>
                   </h3>
                   <p className="text-sm text-slate-600 mb-4">
-                    Total Games Played: <span className="font-bold">{totalGamesPlayed}</span>
+                    📅 {history[0]?.timestamp?.toDate?.()?.toLocaleDateString() || 'Unknown'}
                   </p>
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="text-left py-3 px-4 font-medium">Player</th>
-                          <th className="text-center py-3 px-4 font-medium">Total Rejoins</th>
-                          <th className="text-right py-3 px-4 font-medium">Profit / Loss</th>
+                          <th className="text-left py-3 px-4 font-medium">Game</th>
+                          {Array.from(new Set(history.flatMap((g: any) => g.playerStats.map((ps: any) => ps.name)))).sort().map((name: string, i: number) => {
+                            const totalRejoins = history.reduce((sum: number, g: any) => {
+                              const ps = g.playerStats.find((p: any) => p.name === name);
+                              return sum + (ps ? ps.rejoinCount : 0);
+                            }, 0);
+                            return (
+                          <th key={i} className="text-center py-3 px-4 font-medium">
+                            {name}
+                          </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody>
-                        {cumulativePlayers.map((p, i) => (
-                          <tr key={i} className="border-t hover:bg-slate-50">
-                            <td className="py-3 px-4 font-medium">{p.name}</td>
-                            <td className="py-3 px-4 text-center">{p.totalRejoins}</td>
-                            <td
-                              className={`py-3 px-4 text-right font-bold ${
-                                p.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'
-                              }`}
-                            >
-                              {p.profitLoss >= 0 ? `+₹${p.profitLoss}` : `-₹${Math.abs(p.profitLoss)}`}
-                            </td>
-                          </tr>
-                        ))}
+                        {history.slice().reverse().map((game, i) => {
+                          const allPlayers = Array.from(new Set(history.flatMap(g => g.playerStats.map((ps: any) => ps.name)))).sort();
+                          return (
+                            <tr key={i} className="border-t hover:bg-slate-50">
+                              <td className="py-3 px-4 font-medium">{i + 1}</td>
+                              {allPlayers.map((name, j) => {
+                                const ps = game.playerStats.find((p: any) => p.name === name);
+                                const net = ps ? ps.net : 0;
+                                return (
+                                  <td key={j} className={`py-3 px-4 text-center font-bold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {net >= 0 ? `+₹${Math.round(net)} +${ps ? ps.rejoinCount : 0}` : `-₹${Math.round(Math.abs(net))} +${ps ? ps.rejoinCount : 0}`}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t bg-slate-100">
+                          <td className="py-3 px-4 font-bold">TOTAL</td>
+                          {Array.from(new Set(history.flatMap((g: any) => g.playerStats.map((ps: any) => ps.name)))).sort().map((name, j) => {
+                            const totalNet = history.reduce((sum, g: any) => {
+                              const ps = g.playerStats.find((p: any) => p.name === name);
+                              return sum + (ps ? ps.net : 0);
+                            }, 0);
+                            const totalRejoins = history.reduce((sum: number, g: any) => {
+                              const ps = g.playerStats.find((p: any) => p.name === name);
+                              return sum + (ps ? ps.rejoinCount : 0);
+                            }, 0);
+                            return (
+                              <td key={j} className={`py-3 px-4 text-center font-bold ${totalNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {totalNet >= 0 ? `+₹${Math.round(totalNet)} +${totalRejoins}` : `-₹${Math.round(Math.abs(totalNet))} +${totalRejoins}`}
+                              </td>
+                            );
+                          })}
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -995,7 +1052,7 @@ else {
               </div>
             )}
 
-            <div className="space-y-3 min-h-[100px]">
+            <div className="space-y-3 min-h-25">
               {players.length === 0 && (
                 <p className="text-center py-8 text-slate-400">Add players to start</p>
               )}
@@ -1018,7 +1075,7 @@ else {
                 await syncToDb({ gameStarted: true });
               })}
               disabled={players.length < 2}
-              className={`w-full py-5 rounded-xl font-bold text-lg ${
+              className={`w-full py-4 rounded-xl font-bold text-lg ${
                 players.length < 2
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   : 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -1046,7 +1103,7 @@ else {
       <div className="max-w-2xl mx-auto p-4 sm:p-5 space-y-5 pb-24">
 
         {/* Room Code Banner */}
-        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-xl p-5 shadow-lg">
+        <div className="bg-linear-to-br from-indigo-600 to-indigo-800 text-white rounded-xl p-5 shadow-lg">
           <div className="flex justify-between items-center">
             <div>
               <p className="text-xs uppercase opacity-80">Room Code</p>
@@ -1066,7 +1123,7 @@ else {
         </div>
 
         {/* Header - Pot & Round Info */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 shadow-lg">
+        <div className="bg-linear-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 shadow-lg">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-xs text-slate-400 uppercase">Total Pot</p>
