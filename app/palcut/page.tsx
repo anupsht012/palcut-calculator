@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import {
   doc,
   setDoc,
@@ -12,11 +11,14 @@ import {
   serverTimestamp,
   query,
   orderBy,
-  deleteDoc
+  deleteDoc,
+  Timestamp
 } from "firebase/firestore";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { db, GAME_ID } from './firebase/firebaseConfig';
+import { db, analytics } from './firebase/firebaseConfig';
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { logEvent } from "firebase/analytics";
 import { Watermark } from './firebase/myWaterMark/watermark';
 
 export type Multiplier = 'Normal' | 'Dedi' | 'Double' | 'Chaubar';
@@ -32,6 +34,10 @@ interface Player {
 }
 
 const PalCutGame = () => {
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [joiningCode, setJoiningCode] = useState('');
+  const [authReady, setAuthReady] = useState(false);
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [roundsPlayed, setRoundsPlayed] = useState(0);
@@ -65,6 +71,99 @@ const PalCutGame = () => {
   const [previousRoundScores, setPreviousRoundScores] = useState<Record<string, string>>({});
   const [previousMultiplier, setPreviousMultiplier] = useState<Multiplier>('Normal');
   const [isEditingLastRound, setIsEditingLastRound] = useState(false);
+
+  // Anonymous Authentication & Room Code persistence
+  useEffect(() => {
+    const auth = getAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch((err) => {
+          console.error("Anonymous sign-in error:", err);
+        });
+      } else {
+        setAuthReady(true);
+        if (analytics) {
+          logEvent(analytics, 'session_started', { method: 'anonymous' });
+        }
+      }
+    });
+
+    const savedRoom = localStorage.getItem('palcut_room');
+    if (savedRoom) {
+      setRoomCode(savedRoom.toUpperCase());
+    }
+
+    return () => unsubscribe();
+  }, []);
+
+  const createNewRoom = () => {
+    const newCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+    setRoomCode(newCode);
+    localStorage.setItem('palcut_room', newCode);
+    if (analytics) logEvent(analytics, 'room_created', { roomCode: newCode });
+  };
+
+  const joinRoom = () => {
+    const code = joiningCode.trim().toUpperCase();
+    if (code.length < 4) {
+      alert("Room code should be at least 4 characters");
+      return;
+    }
+    setRoomCode(code);
+    localStorage.setItem('palcut_room', code);
+    if (analytics) logEvent(analytics, 'room_joined', { roomCode: code });
+  };
+
+  // Firestore listener + auto-create with expireAt
+  useEffect(() => {
+    if (!authReady || !roomCode) return;
+
+    const gameRef = doc(db, "games", roomCode);
+
+    const unsub = onSnapshot(gameRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPlayers(data.players || []);
+        setGameStarted(data.gameStarted || false);
+        setRoundsPlayed(data.roundsPlayed || 0);
+        setBuyInAmount(data.buyInAmount || 100);
+      } else {
+        // Create new room document with expireAt = now + 10 minutes
+        setDoc(gameRef, {
+          players: [],
+          gameStarted: false,
+          roundsPlayed: 0,
+          buyInAmount: 100,
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp(),
+          expireAt: Timestamp.fromMillis(Date.now() + 24 *60 * 60 * 1000), // 10 minutes TTL window
+        }).catch(console.error);
+      }
+    }, (err) => {
+      console.error("Snapshot error:", err);
+    });
+
+    return () => unsub();
+  }, [authReady, roomCode]);
+
+  const syncToDb = async (updates: any) => {
+    if (!roomCode) return;
+    const gameRef = doc(db, "games", roomCode);
+
+    // Always refresh expireAt on write → extends TTL by 10 minutes
+    const extendedUpdates = {
+      ...updates,
+      lastActive: serverTimestamp(),
+      expireAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
+    };
+
+    try {
+      await setDoc(gameRef, extendedUpdates, { merge: true });
+    } catch (err) {
+      console.error("Sync failed:", err);
+    }
+  };
 
   const withLoading = async (fn: () => Promise<void>) => {
     setIsLoading(true);
@@ -103,34 +202,23 @@ const PalCutGame = () => {
     return { playersData, totalGames };
   };
 
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "games", GAME_ID), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPlayers(data.players || []);
-        setGameStarted(data.gameStarted || false);
-        setRoundsPlayed(data.roundsPlayed || 0);
-        setBuyInAmount(data.buyInAmount || 100);
-      }
-    });
-
-    const saved = localStorage.getItem('palcut_frequent_players');
-    if (saved) setFrequentNames(JSON.parse(saved));
-
-    return () => unsub();
-  }, []);
-
-  const syncToDb = async (updates: any) => {
-    await setDoc(doc(db, "games", GAME_ID), updates, { merge: true });
-  };
-
   const fetchHistory = async () => {
+    if (!roomCode) {
+      alert("No room selected");
+      return;
+    }
+
     await withLoading(async () => {
       setIsLoadingHistory(true);
       try {
-        const q = query(collection(db, "history"), orderBy("timestamp", "desc"));
+        const historyRef = collection(db, "games", roomCode, "completedGames");
+        const q = query(historyRef, orderBy("timestamp", "desc"));
         const querySnapshot = await getDocs(q);
-        const historyData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const historyData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
 
         const { playersData, totalGames } = computeCumulative(historyData);
 
@@ -140,6 +228,7 @@ const PalCutGame = () => {
         setView('history');
       } catch (error) {
         console.error("Error fetching history:", error);
+        alert("Could not load history for this room.");
       } finally {
         setIsLoadingHistory(false);
       }
@@ -187,15 +276,12 @@ const PalCutGame = () => {
     });
   };
 
-
-
   const submitRound = async () => {
     if (!winnerId) {
       alert("Select a winner!");
       return;
     }
 
-    // Normal round
     setPreviousPlayers([...players]);
     setPreviousRoundsPlayed(roundsPlayed);
     setPreviousWinnerId(winnerId);
@@ -310,7 +396,8 @@ const PalCutGame = () => {
         };
       });
 
-      await addDoc(collection(db, "history"), {
+      // Save completed game to subcollection
+      await addDoc(collection(db, "games", roomCode!, "completedGames"), {
         winnerName: winnerDisplay,
         totalPot: totalPot,
         roundsPlayed: roundsPlayed,
@@ -329,7 +416,8 @@ const PalCutGame = () => {
         canNoLongerRejoin: false
       }));
 
-      await setDoc(doc(db, "games", GAME_ID), {
+      // Reset main game document (also refreshes expireAt via syncToDb)
+      await syncToDb({
         players: resetPlayers,
         gameStarted: false,
         roundsPlayed: 0,
@@ -347,7 +435,7 @@ const PalCutGame = () => {
   };
 
   const resetLiveGame = async () => {
-    if (!confirm("Reset current game scores and payments?")) return;
+    if (!confirm("Reset current game scores and payments? This cannot be undone.")) return;
 
     await withLoading(async () => {
       const resetPlayers = players.map(p => ({
@@ -359,7 +447,7 @@ const PalCutGame = () => {
         canNoLongerRejoin: false
       }));
 
-      await setDoc(doc(db, "games", GAME_ID), {
+      await syncToDb({
         players: resetPlayers,
         gameStarted: false,
         roundsPlayed: 0,
@@ -479,13 +567,73 @@ const PalCutGame = () => {
     </div>
   );
 
+  // Room selection screen
+  if (!authReady || !roomCode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 space-y-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-extrabold text-slate-800">Palcut</h1>
+            <p className="mt-2 text-slate-600">Score Calculator for Friends</p>
+            <p className="mt-1 text-sm text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
+          </div>
+
+          <div className="space-y-6">
+            <button
+              onClick={createNewRoom}
+              className="w-full py-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xl rounded-xl shadow-lg transition transform hover:scale-105"
+            >
+              Start New Table
+            </button>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-slate-500">or join existing table</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <input
+                value={joiningCode}
+                onChange={(e) => setJoiningCode(e.target.value.toUpperCase())}
+                placeholder="Enter room code (e.g. X7P4Q9)"
+                className="w-full p-5 text-center text-2xl font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
+                maxLength={8}
+                onKeyDown={(e) => e.key === 'Enter' && joinRoom()}
+              />
+              <button
+                onClick={joinRoom}
+                disabled={joiningCode.trim().length < 4}
+                className={`w-full py-5 font-bold text-xl rounded-xl transition ${
+                  joiningCode.trim().length >= 4
+                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                Join Table
+              </button>
+            </div>
+          </div>
+
+          <Watermark />
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'history') {
     return (
       <div className="h-screen w-screen overflow-y-auto bg-slate-50">
         {isLoading && LoaderOverlay}
         <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 pt-2 pb-4 border-b">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Game History</h2>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Game History</h2>
+              <p className="text-sm text-slate-600">Room: <span className="font-mono font-bold">{roomCode}</span></p>
+            </div>
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setView('game')}
@@ -507,10 +655,10 @@ const PalCutGame = () => {
           {isLoadingHistory ? (
             <div className="text-center py-20">
               <div className="w-12 h-12 mx-auto border-4 border-t-emerald-500 border-slate-200 rounded-full animate-spin" />
-              <p className="mt-4 text-slate-600">Loading...</p>
+              <p className="mt-4 text-slate-600">Loading history...</p>
             </div>
           ) : history.length === 0 ? (
-            <p className="text-center py-16 text-slate-500">No games yet</p>
+            <p className="text-center py-16 text-slate-500">No completed games yet in this room</p>
           ) : (
             <>
               {history.map((game) => (
@@ -521,9 +669,9 @@ const PalCutGame = () => {
                         <p className="text-xl font-bold">🏆 {game.winnerName}</p>
                         <button
                           onClick={async () => {
-                            if (confirm("Delete this game?")) {
+                            if (confirm("Delete this game record?")) {
                               await withLoading(async () => {
-                                await deleteDoc(doc(db, "history", game.id));
+                                await deleteDoc(doc(db, "games", roomCode, "completedGames", game.id));
                                 const newHistory = history.filter(h => h.id !== game.id);
                                 setHistory(newHistory);
                                 const { playersData, totalGames } = computeCumulative(newHistory);
@@ -581,7 +729,7 @@ const PalCutGame = () => {
                 <div className="mt-10 bg-white rounded-xl shadow-sm p-5">
                   <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
                     Overall Profit / Loss
-                    <span className="text-xs font-normal text-slate-500">(All Games Combined)</span>
+                    <span className="text-xs font-normal text-slate-500">(This Room)</span>
                   </h3>
                   <p className="text-sm text-slate-600 mb-4">
                     Total Games Played: <span className="font-bold">{totalGamesPlayed}</span>
@@ -614,7 +762,7 @@ const PalCutGame = () => {
                     </table>
                   </div>
                   <p className="text-xs text-slate-500 mt-4">
-                    Total profit or loss across all completed games (rounded)
+                    Total profit or loss across all completed games in this room
                   </p>
                 </div>
               )}
@@ -681,13 +829,29 @@ const PalCutGame = () => {
         <div className="max-w-lg mx-auto p-5 space-y-6">
           <div className="bg-white rounded-xl shadow p-6 space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-800">Palcut Calculator</h2>
-              <button
-                onClick={fetchHistory}
-                className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100"
-              >
-                History
-              </button>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Palcut Calculator</h2>
+                <p className="text-sm font-medium text-emerald-600">Room: {roomCode}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (confirm("Leave this room and choose another?")) {
+                      localStorage.removeItem('palcut_room');
+                      setRoomCode(null);
+                    }
+                  }}
+                  className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100"
+                >
+                  Change Room
+                </button>
+                <button
+                  onClick={fetchHistory}
+                  className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100"
+                >
+                  History
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -705,51 +869,44 @@ const PalCutGame = () => {
               </button>
             </div>
 
-           <div>
-  <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in (₹)</p>
-  <input
-  type="number"
-  min={50}
-  max={999}
-  value={buyInAmount}
-  disabled={gameStarted}
-  onChange={async (e) => {
-    const value = Number(e.target.value);
+            <div>
+              <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in (₹)</p>
+              <input
+                type="number"
+                min={50}
+                max={999}
+                value={buyInAmount}
+                disabled={gameStarted}
+                onChange={async (e) => {
+                  const value = Number(e.target.value);
+                  if (isNaN(value) || value < 50 || value > 999) return;
 
-    // Prevent invalid values
-    if (isNaN(value) || value < 50 || value > 999) return;
+                  setBuyInAmount(value);
 
-    // 1. Update state immediately
-    setBuyInAmount(value);
+                  if (!gameStarted) {
+                    const updatedPlayers = players.map(p => ({
+                      ...p,
+                      totalPaid: value,
+                    }));
 
-    // 2. Update existing players (before game start)
-    if (!gameStarted) {
-      const updatedPlayers = players.map(p => ({
-        ...p,
-        totalPaid: value,
-      }));
+                    setPlayers(updatedPlayers);
 
-      setPlayers(updatedPlayers);
-
-      // 3. Sync to Firestore
-      await syncToDb({
-        buyInAmount: value,
-        players: updatedPlayers,
-      });
-    }
-  }}
-  className={`w-full p-4 rounded-xl text-center text-xl font-bold
-    ${gameStarted ? 'bg-slate-200 cursor-not-allowed' : 'bg-slate-50'}
-  `}
-/>
-
-
-  <p className="text-xs text-slate-500 mt-1">Min ₹50, Max ₹999</p>
-</div>
+                    await syncToDb({
+                      buyInAmount: value,
+                      players: updatedPlayers,
+                    });
+                  }
+                }}
+                className={`w-full p-4 rounded-xl text-center text-xl font-bold
+                  ${gameStarted ? 'bg-slate-200 cursor-not-allowed' : 'bg-slate-50'}
+                `}
+              />
+              <p className="text-xs text-slate-500 mt-1">Min ₹50, Max ₹999</p>
+            </div>
 
             {frequentNames.length > 0 && (
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Recent</p>
+                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Recent Players</p>
                 <div className="flex flex-wrap gap-2">
                   {frequentNames.map(name => (
                     <div
@@ -818,7 +975,28 @@ const PalCutGame = () => {
     <div className="h-screen w-screen overflow-y-auto bg-slate-50">
       {isLoading && LoaderOverlay}
       <div className="max-w-2xl mx-auto p-4 sm:p-5 space-y-5 pb-24">
-        {/* Header */}
+
+        {/* Room Code Banner */}
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-xl p-5 shadow-lg">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs uppercase opacity-80">Room Code</p>
+              <p className="text-3xl font-black tracking-widest">{roomCode}</p>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(roomCode || '');
+                alert("Room code copied to clipboard!");
+              }}
+              className="bg-white/20 hover:bg-white/30 px-5 py-3 rounded-lg text-sm font-medium transition"
+            >
+              Copy Code
+            </button>
+          </div>
+          <p className="text-xs mt-3 opacity-80">Share this code with everyone at your table</p>
+        </div>
+
+        {/* Header - Pot & Round Info */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5 shadow-lg">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -837,7 +1015,7 @@ const PalCutGame = () => {
               <p className="font-bold truncate">{rankedPlayers[0]?.name || '-'}</p>
             </div>
             <div className="bg-white/10 p-3 rounded-lg">
-              <p className="text-xs text-slate-300 uppercase">Active</p>
+              <p className="text-xs text-slate-300 uppercase">Active Players</p>
               <p className="font-bold text-emerald-400">
                 {players.filter(p => !p.isOut).length} / {players.length}
               </p>
@@ -845,7 +1023,7 @@ const PalCutGame = () => {
           </div>
         </div>
 
-        {/* Compact Multiplier selector */}
+        {/* Multiplier Selector */}
         <div className="flex bg-slate-100/80 backdrop-blur-sm p-1 rounded-xl gap-1 border border-slate-200">
           {(['Normal', 'Dedi', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
             <button
@@ -864,7 +1042,7 @@ const PalCutGame = () => {
           ))}
         </div>
 
-        {/* Players */}
+        {/* Players List */}
         <div className="space-y-4">
           {players.map(player => (
             <div
@@ -934,12 +1112,13 @@ const PalCutGame = () => {
             </div>
           ))}
         </div>
-{isEditingLastRound && (
-  <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-center text-sm">
-    ⚠️ Editing last round — changes will be saved when you click SAVE CORRECTION
-  </div>
-)}
-        {/* Action buttons + correction button */}
+
+        {isEditingLastRound && (
+          <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-center text-sm">
+            ⚠️ Editing last round — save when ready
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
           <button
             onClick={submitRound}
