@@ -1001,7 +1001,7 @@ const PalCutGame = () => {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Player name"
-                className="flex-1 p-4 bg-slate-50 border rounded-xl focus:border-indigo-500 outline-none"
+                className="flex-1 p-4 font-black bg-slate-50 border rounded-xl focus:border-indigo-500 outline-none"
               />
               <button
                 onClick={() => addPlayer()}
