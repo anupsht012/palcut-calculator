@@ -403,7 +403,7 @@ const PalCutGame = () => {
 
       if (isDirectWin && directWinnerId) {
         const winner = players.find(p => p.id === directWinnerId)!;
-
+const isDirectEliminated = !isWinner && p.isOut && p.cumulativeScore === 100; // or just check !isWinner && was active
         payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
         winnerDisplay = winner.name;
 
@@ -412,7 +412,11 @@ const PalCutGame = () => {
 
           return {
             name: p.name,
-            score: p.cumulativeScore,
+            score: isWinner 
+        ? p.cumulativeScore                          // real score for winner
+        : isDirectEliminated 
+          ? 100                                      // force 100 for direct-win losers
+          : p.cumulativeScore,
             paid: p.totalPaid,
             net: isWinner
               ? Math.round(totalPot - p.totalPaid)
@@ -923,7 +927,7 @@ const PalCutGame = () => {
       <div className="h-screen w-screen overflow-y-auto bg-slate-50">
         {isLoading && LoaderOverlay}
         <div className="max-w-2xl mx-auto p-5 space-y-6">
-          <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white rounded-xl p-6 shadow-xl">
+          <div className="bg-linear-to-b from-slate-900 to-slate-800 text-white rounded-xl p-6 shadow-xl">
             <h2 className="text-emerald-400 text-xs font-bold uppercase tracking-wide mb-2">
               {finalPayoutDescription}
             </h2>
