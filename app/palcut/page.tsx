@@ -20,6 +20,7 @@ import { db, analytics } from './firebase/firebaseConfig';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { logEvent } from "firebase/analytics";
 import { Watermark } from './firebase/myWaterMark/watermark';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 export type Multiplier = 'Normal' | 'Dedi' | 'Double' | 'Chaubar';
 
@@ -72,6 +73,40 @@ const PalCutGame = () => {
   const [previousRoundScores, setPreviousRoundScores] = useState<Record<string, string>>({});
   const [previousMultiplier, setPreviousMultiplier] = useState<Multiplier>('Normal');
   const [isEditingLastRound, setIsEditingLastRound] = useState(false);
+  // Dialog control states
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<{
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger" | "warning";
+  } | null>(null);
+
+  const openConfirmDialog = ({
+    message,
+    title = "Confirm",
+    confirmText = "Yes",
+    cancelText = "No",
+    onConfirm,
+    variant = "default" as const,
+  }: {
+    message: string;
+    title?: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger" | "warning";
+  }) => {
+    setDialogConfig({ message, title, confirmText, cancelText, onConfirm, variant });
+    setShowDialog(true);
+  };
+
+  const closeDialog = () => {
+    setShowDialog(false);
+    setDialogConfig(null);
+  };
 
   // Anonymous Authentication & Room Code persistence
   useEffect(() => {
@@ -113,7 +148,14 @@ const PalCutGame = () => {
   const joinRoom = () => {
     const code = joiningCode.trim().toUpperCase();
     if (code.length < 4) {
-      alert("Room code should be at least 4 characters");
+      openConfirmDialog({
+        title: "Invalid Room Code",
+        message: "Room code should be at least 4 characters.",
+        confirmText: "OK",
+        cancelText: "",
+        onConfirm: closeDialog,
+        variant: "default",
+      });
       return;
     }
     setRoomCode(code);
@@ -208,7 +250,13 @@ const PalCutGame = () => {
 
   const fetchHistory = async () => {
     if (!roomCode) {
-      alert("No room selected");
+      openConfirmDialog({
+        title: "No Room",
+        message: "No room selected. Please join or create a room first.",
+        confirmText: "OK",
+        cancelText: "",
+        onConfirm: closeDialog,
+      });
       return;
     }
 
@@ -282,7 +330,17 @@ const PalCutGame = () => {
 
   const submitRound = async () => {
     if (!winnerId) {
-      alert("Select a winner!");
+      openConfirmDialog({
+        message: "Finish game and save results?",
+        title: "End Game",
+        confirmText: "Finish",
+        cancelText: "Cancel",
+        variant: "danger",
+        onConfirm: async () => {
+          await handleFinishGame();
+          closeDialog();
+        },
+      });
       return;
     }
 
@@ -360,14 +418,22 @@ const PalCutGame = () => {
   const startCorrectLastRound = () => {
     if (!previousPlayers || previousRoundsPlayed === null) return;
 
-    if (!confirm("This will let you edit the last round's winner and scores. Continue?")) return;
-
-    setPlayers(previousPlayers);
-    setRoundsPlayed(previousRoundsPlayed);
-    setWinnerId(previousWinnerId);
-    setRoundScores(previousRoundScores);
-    setMultiplier(previousMultiplier);
-    setIsEditingLastRound(true);
+    openConfirmDialog({
+      message: "This will let you edit the last round's winner and scores. Continue?",
+      title: "Edit Last Round",
+      confirmText: "Yes, Edit",
+      cancelText: "Cancel",
+      variant: "warning",
+      onConfirm: () => {
+        setPlayers(previousPlayers);
+        setRoundsPlayed(previousRoundsPlayed);
+        setWinnerId(previousWinnerId);
+        setRoundScores(previousRoundScores);
+        setMultiplier(previousMultiplier);
+        setIsEditingLastRound(true);
+        closeDialog();
+      },
+    });
   };
 
   const rejoin = async (id: string) => {
@@ -390,125 +456,142 @@ const PalCutGame = () => {
   };
 
   const handleFinishGame = async (isDirectWin: boolean = false, directWinnerId?: string) => {
+    openConfirmDialog({
+      message: "Finish game and save results?",
+      title: "End Game",
+      confirmText: "Finish",
+      cancelText: "Cancel",
+      variant: "danger",
+      onConfirm: async () => {
+        // Put your existing finish logic here
+        await withLoading(async () => {
+          const activePlayers = players.filter(p => !p.isOut);
+          const activeCount = activePlayers.length;
 
-    if (!confirm("Finish game and save results?")) return;
+          let payoutDescription = '';
+          let winnerDisplay = '';
+          let stats: any[] = [];
 
-    await withLoading(async () => {
-      const activePlayers = players.filter(p => !p.isOut);
-      const activeCount = activePlayers.length;
+          if (isDirectWin && directWinnerId) {
+            const winner = players.find(p => p.id === directWinnerId)!;
+            payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
+            winnerDisplay = winner.name;
 
-      let payoutDescription = '';
-      let winnerDisplay = '';
-      let stats: any[] = [];
+            stats = players.map(p => {
+              const isWinner = p.id === directWinnerId;
+              return {
+                name: p.name,
+                score: isWinner ? p.cumulativeScore : 100,
+                paid: p.totalPaid,
+                net: isWinner
+                  ? Math.round(totalPot - p.totalPaid)
+                  : -p.totalPaid,
+                isWinner,
+                rejoinCount: p.rejoinCount || 0,
+              };
+            });
+          }
+          else {
+            // Normal finish
+            if (activeCount === 0) {
+              payoutDescription = 'No winners (all eliminated)';
+              winnerDisplay = '—';
+            } else if (activeCount === 1) {
+              payoutDescription = 'Full Winner (last remaining)';
+              winnerDisplay = activePlayers[0].name;
+            } else {
+              payoutDescription = `Split equally among ${activeCount} remaining players`;
+              winnerDisplay = activePlayers.map(p => p.name).join(', ');
+            }
 
-      if (isDirectWin && directWinnerId) {
-        const winner = players.find(p => p.id === directWinnerId)!;
-        payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
-        winnerDisplay = winner.name;
+            const sharePerWinner = activeCount > 0 ? totalPot / activeCount : 0;
 
-        stats = players.map(p => {
-          const isWinner = p.id === directWinnerId;
-          return {
-            name: p.name,
-           score: isWinner ? p.cumulativeScore : 100,
-            paid: p.totalPaid,
-            net: isWinner
-              ? Math.round(totalPot - p.totalPaid)
-              : -p.totalPaid,
-            isWinner,
-            rejoinCount: p.rejoinCount || 0,
-          };
+            stats = players.map(p => {
+              const isActive = !p.isOut;
+              let net = -p.totalPaid;
+              if (isActive) net += sharePerWinner;
+
+              return {
+                name: p.name,
+                score: p.cumulativeScore,
+                paid: p.totalPaid,
+                net: Math.round(net),
+                isWinner: isActive,
+                rejoinCount: p.rejoinCount || 0,
+              };
+            });
+          }
+
+          // Save completed game to subcollection
+          await addDoc(collection(db, "games", roomCode!, "completedGames"), {
+            winnerName: winnerDisplay,
+            totalPot: totalPot,
+            roundsPlayed: roundsPlayed,
+            payoutDescription,
+            activeWinnersCount: activeCount,
+            timestamp: serverTimestamp(),
+            playerStats: stats,
+            isDirectWin,
+          });
+
+          const resetPlayers = players.map(p => ({
+            ...p,
+            cumulativeScore: 0,
+            isOut: false,
+            totalPaid: buyInAmount,
+            rejoinCount: 0,
+            canNoLongerRejoin: false
+          }));
+
+          await syncToDb({
+            players: resetPlayers,
+            gameStarted: false,
+            roundsPlayed: 0,
+            buyInAmount
+          });
+
+          setFinalWinnerName(winnerDisplay);
+          setFinalPotAmount(totalPot);
+          setFinalRounds(roundsPlayed);
+          setFinalStats(stats);
+          setFinalPayoutDescription(payoutDescription);
+
+          setShowSummary(true);
         });
-      }
-      else {
-        // Normal finish
-        if (activeCount === 0) {
-          payoutDescription = 'No winners (all eliminated)';
-          winnerDisplay = '—';
-        } else if (activeCount === 1) {
-          payoutDescription = 'Full Winner (last remaining)';
-          winnerDisplay = activePlayers[0].name;
-        } else {
-          payoutDescription = `Split equally among ${activeCount} remaining players`;
-          winnerDisplay = activePlayers.map(p => p.name).join(', ');
-        }
-
-        const sharePerWinner = activeCount > 0 ? totalPot / activeCount : 0;
-
-        stats = players.map(p => {
-          const isActive = !p.isOut;
-          let net = -p.totalPaid;
-          if (isActive) net += sharePerWinner;
-
-          return {
-            name: p.name,
-            score: p.cumulativeScore,
-            paid: p.totalPaid,
-            net: Math.round(net),
-            isWinner: isActive,
-            rejoinCount: p.rejoinCount || 0,
-          };
-        });
-      }
-
-      // Save completed game to subcollection
-      await addDoc(collection(db, "games", roomCode!, "completedGames"), {
-        winnerName: winnerDisplay,
-        totalPot: totalPot,
-        roundsPlayed: roundsPlayed,
-        payoutDescription,
-        activeWinnersCount: activeCount,
-        timestamp: serverTimestamp(),
-        playerStats: stats,
-        isDirectWin,
-      });
-
-      const resetPlayers = players.map(p => ({
-        ...p,
-        cumulativeScore: 0,
-        isOut: false,
-        totalPaid: buyInAmount,
-        rejoinCount: 0,
-        canNoLongerRejoin: false
-      }));
-
-      await syncToDb({
-        players: resetPlayers,
-        gameStarted: false,
-        roundsPlayed: 0,
-        buyInAmount
-      });
-
-      setFinalWinnerName(winnerDisplay);
-      setFinalPotAmount(totalPot);
-      setFinalRounds(roundsPlayed);
-      setFinalStats(stats);
-      setFinalPayoutDescription(payoutDescription);
-
-      setShowSummary(true);
+        closeDialog();
+      },
     });
+
   };
 
   const resetLiveGame = async () => {
-    if (!confirm("Reset current game scores and payments? This cannot be undone.")) return;
+    openConfirmDialog({
+      message: "Reset current game scores and payments? This cannot be undone.",
+      title: "Reset Game",
+      confirmText: "Reset",
+      cancelText: "Cancel",
+      variant: "danger",
+      onConfirm: async () => {
+        await withLoading(async () => {
+          const resetPlayers = players.map(p => ({
+            ...p,
+            cumulativeScore: 0,
+            isOut: false,
+            totalPaid: buyInAmount,
+            rejoinCount: 0,
+            canNoLongerRejoin: false
+          }));
 
-    await withLoading(async () => {
-      const resetPlayers = players.map(p => ({
-        ...p,
-        cumulativeScore: 0,
-        isOut: false,
-        totalPaid: buyInAmount,
-        rejoinCount: 0,
-        canNoLongerRejoin: false
-      }));
-
-      await syncToDb({
-        players: resetPlayers,
-        gameStarted: false,
-        roundsPlayed: 0,
-        buyInAmount
-      });
-      window.location.reload();
+          await syncToDb({
+            players: resetPlayers,
+            gameStarted: false,
+            roundsPlayed: 0,
+            buyInAmount
+          });
+          window.location.reload();
+        });
+        closeDialog();
+      },
     });
   };
 
@@ -708,10 +791,21 @@ const PalCutGame = () => {
             </div>
           </div>
 
-          <Watermark />
-        </div>
-      </div>
-    );
+      <Watermark />
+      {showDialog && dialogConfig && (
+        <ConfirmDialog
+          isOpen={showDialog}
+          title={dialogConfig.title}
+          message={dialogConfig.message}
+          confirmText={dialogConfig.confirmText}
+          cancelText={dialogConfig.cancelText}
+          onConfirm={dialogConfig.onConfirm}
+          onCancel={closeDialog}
+        />
+      )}
+    </div>
+  </div>
+);
   }
 
   if (view === 'history') {
@@ -911,6 +1005,17 @@ const PalCutGame = () => {
           )}
 
           <Watermark />
+          {showDialog && dialogConfig && (
+            <ConfirmDialog
+              isOpen={showDialog}
+              title={dialogConfig.title}
+              message={dialogConfig.message}
+              confirmText={dialogConfig.confirmText}
+              cancelText={dialogConfig.cancelText}
+              onConfirm={dialogConfig.onConfirm}
+              onCancel={closeDialog}
+            />
+          )}
         </div>
       </div>
     );
@@ -957,6 +1062,17 @@ const PalCutGame = () => {
           </button>
 
           <Watermark />
+          {showDialog && dialogConfig && (
+            <ConfirmDialog
+              isOpen={showDialog}
+              title={dialogConfig.title}
+              message={dialogConfig.message}
+              confirmText={dialogConfig.confirmText}
+              cancelText={dialogConfig.cancelText}
+              onConfirm={dialogConfig.onConfirm}
+              onCancel={closeDialog}
+            />
+          )}
         </div>
       </div>
     );
@@ -976,10 +1092,18 @@ const PalCutGame = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    if (confirm("Leave this room and choose another?")) {
-                      localStorage.removeItem('palcut_room');
-                      setRoomCode(null);
-                    }
+                    openConfirmDialog({
+                      title: "Change Room",
+                      message: "Leave this room and choose another?",
+                      confirmText: "Yes, Change",
+                      cancelText: "Cancel",
+                      onConfirm: () => {
+                        localStorage.removeItem('palcut_room');
+                        setRoomCode(null);
+                        closeDialog();
+                      },
+                    });
+
                   }}
                   className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100"
                 >
@@ -1103,6 +1227,17 @@ const PalCutGame = () => {
           </div>
 
           <Watermark />
+          {showDialog && dialogConfig && (
+            <ConfirmDialog
+              isOpen={showDialog}
+              title={dialogConfig.title}
+              message={dialogConfig.message}
+              confirmText={dialogConfig.confirmText}
+              cancelText={dialogConfig.cancelText}
+              onConfirm={dialogConfig.onConfirm}
+              onCancel={closeDialog}
+            />
+          )}
         </div>
       </div>
     );
@@ -1129,7 +1264,14 @@ const PalCutGame = () => {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(roomCode || '');
-                alert("Room code copied to clipboard!");
+                openConfirmDialog({
+                  title: "Copied!",
+                  message: "Room code copied to clipboard.",
+                  confirmText: "OK",
+                  cancelText: "",
+                  onConfirm: closeDialog,
+                });
+
               }}
               className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-xs font-medium transition"
             >
@@ -1313,6 +1455,17 @@ const PalCutGame = () => {
 
         <Watermark />
       </div>
+      {showDialog && dialogConfig && (
+        <ConfirmDialog
+          isOpen={showDialog}
+          title={dialogConfig.title}
+          message={dialogConfig.message}
+          confirmText={dialogConfig.confirmText}
+          cancelText={dialogConfig.cancelText}
+          onConfirm={dialogConfig.onConfirm}
+          onCancel={closeDialog}
+        />
+      )}
     </div>
   );
 };
