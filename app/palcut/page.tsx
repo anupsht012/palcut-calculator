@@ -693,7 +693,7 @@ const PalCutGame = () => {
                 value={joiningCode}
                 onChange={(e) => setJoiningCode(e.target.value.toUpperCase())}
                 placeholder="Enter room code (e.g. X7P4Q9)"
-                className="w-full p-4 text-center text-md font-bold border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
+                className="w-full p-4 text-center text-md font-bold text-slate-600 border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 outline-none uppercase tracking-widest"
                 maxLength={8}
                 onKeyDown={(e) => e.key === 'Enter' && joinRoom()}
               />
@@ -758,7 +758,7 @@ const PalCutGame = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold">🏆 {game.winnerName}</p>
+                        <p className="text-xl font-bold text-slate-900">🏆 {game.winnerName}</p>
                         {game.isDirectWin && (
                           <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
                             Direct
@@ -799,7 +799,7 @@ const PalCutGame = () => {
                         className="flex justify-between items-center bg-slate-50 p-3 rounded-lg text-sm"
                       >
                         <div>
-                          <span className="font-medium">
+                          <span className="text-slate-900 font-medium">
                             {ps.name}
                             {ps.rejoinCount > 0 && (
                               <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
@@ -825,7 +825,7 @@ const PalCutGame = () => {
               ))}
               {history.length > 0 && (
                 <div className="mt-10 bg-white rounded-xl shadow-sm p-5">
-                  <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 text-lg mb-1 flex items-center gap-2">
                     Overall Profit / Loss
                     <span className="text-xs font-normal text-slate-500">(This Room)</span>
                   </h3>
@@ -837,14 +837,14 @@ const PalCutGame = () => {
                     <table className="w-full text-sm border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="text-left py-3 px-4 font-medium">Game</th>
+                          <th className="text-left py-3 px-4 font-medium text-slate-900">Game</th>
                           {Array.from(new Set(history.flatMap((g: any) => g.playerStats.map((ps: any) => ps.name)))).sort().map((name: string, i: number) => {
                             const totalRejoins = history.reduce((sum: number, g: any) => {
                               const ps = g.playerStats.find((p: any) => p.name === name);
                               return sum + (ps ? ps.rejoinCount : 0);
                             }, 0);
                             return (
-                              <th key={i} className="text-center py-3 px-4 font-medium">
+                              <th key={i} className="text-center py-3 px-4 font-medium text-slate-900">
                                 {name}
                               </th>
                             );
@@ -856,14 +856,14 @@ const PalCutGame = () => {
                           const allPlayers = Array.from(new Set(history.flatMap(g => g.playerStats.map((ps: any) => ps.name)))).sort();
                           return (
                             <tr key={i} className="border-t hover:bg-slate-50">
-                              <td className="py-3 px-4 font-medium">{i + 1}</td>
+                              <td className="py-3 px-4 font-medium text-slate-900">{i + 1}</td>
                               {allPlayers.map((name, j) => {
                                 const ps = game.playerStats.find((p: any) => p.name === name);
                                 const net = ps ? ps.net : 0;
                                 return (
                                   <td
                                     key={j}
-                                    className={`py-3 px-4 text-center font-bold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'
+                                    className={`py-3 px-4 text-center font-bold  ${net >= 0 ? 'text-emerald-600' : 'text-red-600'
                                       }`}
                                   >
                                     {net >= 0
@@ -877,7 +877,7 @@ const PalCutGame = () => {
                           );
                         })}
                         <tr className="border-t bg-slate-100">
-                          <td className="py-3 px-4 font-bold">TOTAL</td>
+                          <td className="py-3 px-4 font-bold text-slate-900">TOTAL</td>
                           {Array.from(new Set(history.flatMap((g: any) => g.playerStats.map((ps: any) => ps.name)))).sort().map((name, j) => {
                             const totalNet = history.reduce((sum, g: any) => {
                               const ps = g.playerStats.find((p: any) => p.name === name);
@@ -1001,7 +1001,7 @@ const PalCutGame = () => {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Player name"
-                className="flex-1 p-4 font-black bg-slate-50 border rounded-xl focus:border-indigo-500 outline-none"
+                className="flex-1 p-4 bg-slate-50 text-slate-800 border rounded-xl focus:border-indigo-500 outline-none"
               />
               <button
                 onClick={() => addPlayer()}
@@ -1039,7 +1039,7 @@ const PalCutGame = () => {
                     });
                   }
                 }}
-                className="w-full p-4 rounded-xl text-center text-xl font-bold bg-slate-50"
+                className="w-full p-4 text-slate-800 rounded-xl text-center text-xl font-bold bg-slate-50"
               />
               <p className="text-xs text-slate-500 mt-1">Min 50, Max 999</p>
             </div>
@@ -1078,7 +1078,7 @@ const PalCutGame = () => {
               )}
               {players.map(p => (
                 <div key={p.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
-                  <span className="font-medium">{p.name}</span>
+                  <span className=" font-bold text-lg text-slate-900">{p.name}</span>
                   <button
                     onClick={() => removePlayer(p.id)}
                     className="text-red-500 text-sm font-medium"
@@ -1204,7 +1204,7 @@ const PalCutGame = () => {
             >
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg">{player.name}</span>
+                  <span className="font-bold text-lg text-slate-900">{player.name}</span>
                   {player.rejoinCount > 0 && (
                     <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                       +{player.rejoinCount}
@@ -1212,8 +1212,8 @@ const PalCutGame = () => {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-black">{player.cumulativeScore}</p>
-                  <p className="text-xs text-slate-500">points</p>
+                  <p className="text-3xl font-black text-slate-900">{player.cumulativeScore}</p>
+                  <p className="text-xs text-slate-900">points</p>
                 </div>
               </div>
 
@@ -1242,7 +1242,7 @@ const PalCutGame = () => {
                           setRoundScores({ ...roundScores, [player.id]: val });
                         }
                       }}
-                      className="w-28 p-3 text-center text-2xl font-bold bg-slate-50 border rounded-lg focus:border-indigo-500 outline-none"
+                      className="w-28 p-3 text-slate-800 text-center text-2xl font-bold bg-slate-50 border rounded-lg focus:border-indigo-500 outline-none"
                       placeholder=""
                     />
                   </div>
