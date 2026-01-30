@@ -304,21 +304,21 @@ const PalCutGame = () => {
     await withLoading(async () => {
       let updatedPlayers = [...players];
 
-     if (isDirectWin) {
-  updatedPlayers = updatedPlayers.map(p => {
-    if (p.id === winnerId) return { ...p };
-    if (!p.isOut) {
-      return { ...p, cumulativeScore: 100, isOut: true };
-    }
-    return p;
-  });
+      if (isDirectWin) {
+        updatedPlayers = updatedPlayers.map(p => {
+          if (p.id === winnerId) return { ...p };
+          if (!p.isOut) {
+            return { ...p, cumulativeScore: 100, isOut: true };
+          }
+          return p;
+        });
 
-  setPlayers(updatedPlayers);
-  setRoundsPlayed(roundsPlayed + 1);
-  await syncToDb({ players: updatedPlayers, roundsPlayed: roundsPlayed + 1 });
+        setPlayers(updatedPlayers);
+        setRoundsPlayed(roundsPlayed + 1);
+        await syncToDb({ players: updatedPlayers, roundsPlayed: roundsPlayed + 1 });
 
-  await handleFinishGame(true, winnerId);
-} else {
+        await handleFinishGame(true, winnerId);
+      } else {
         // Normal scoring
         updatedPlayers = players.map(p => {
           if (p.canNoLongerRejoin) return p;
@@ -390,7 +390,7 @@ const PalCutGame = () => {
   };
 
   const handleFinishGame = async (isDirectWin: boolean = false, directWinnerId?: string) => {
-    
+
     if (!confirm("Finish game and save results?")) return;
 
     await withLoading(async () => {
@@ -401,28 +401,28 @@ const PalCutGame = () => {
       let winnerDisplay = '';
       let stats: any[] = [];
 
-     if (isDirectWin && directWinnerId) {
-  const winner = players.find(p => p.id === directWinnerId)!;
+      if (isDirectWin && directWinnerId) {
+        const winner = players.find(p => p.id === directWinnerId)!;
 
-  payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
-  winnerDisplay = winner.name;
+        payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
+        winnerDisplay = winner.name;
 
-  stats = players.map(p => {
-    const isWinner = p.id === directWinnerId;
+        stats = players.map(p => {
+          const isWinner = p.id === directWinnerId;
 
-    return {
-      name: p.name,
-      score: p.cumulativeScore,
-      paid: p.totalPaid,
-      net: isWinner
-        ? Math.round(totalPot - p.totalPaid)
-        : -p.totalPaid,
-      isWinner,
-      rejoinCount: p.rejoinCount || 0,
-    };
-  });
-}
-else {
+          return {
+            name: p.name,
+            score: p.cumulativeScore,
+            paid: p.totalPaid,
+            net: isWinner
+              ? Math.round(totalPot - p.totalPaid)
+              : -p.totalPaid,
+            isWinner,
+            rejoinCount: p.rejoinCount || 0,
+          };
+        });
+      }
+      else {
         // Normal finish
         if (activeCount === 0) {
           payoutDescription = 'No winners (all eliminated)';
@@ -545,7 +545,7 @@ else {
       doc.setFontSize(11);
       doc.text(`Winner: ${game.winnerName}`, 20, y);
       y += 6;
-      doc.text(`Final Pot: ₹${game.totalPot}`, 20, y);
+      doc.text(`Final Pot: ${game.totalPot}`, 20, y);
       y += 8;
 
       autoTable(doc, {
@@ -556,7 +556,7 @@ else {
           ps.name + (ps.rejoinCount > 0 ? ` (+${ps.rejoinCount})` : ''),
           ps.rejoinCount,
           ps.score,
-          ps.net >= 0 ? `+₹${Math.round(ps.net)}` : `-₹${Math.round(Math.abs(ps.net))}`,
+          ps.net >= 0 ? `+${Math.round(ps.net)}` : `-${Math.round(Math.abs(ps.net))}`,
           ps.isWinner ? 'Winner' : 'Eliminated',
         ]) || [],
         theme: 'grid',
@@ -599,7 +599,10 @@ else {
           const ps = game.playerStats.find((p: any) => p.name === name);
           const net = ps ? ps.net : 0;
           const rejoins = ps ? ps.rejoinCount : 0;
-          const text = net >= 0 ? `+₹${Math.round(net)} +${rejoins}` : `-₹${Math.round(Math.abs(net))} +${rejoins}`;
+          const text =
+            net >= 0
+              ? `+${Math.round(net)}${rejoins > 0 ? ` (+${rejoins})` : ''}`
+              : `-${Math.round(Math.abs(net))}${rejoins > 0 ? ` (+${rejoins})` : ''}`;
           row.push(text);
         });
         return row;
@@ -615,7 +618,10 @@ else {
           const ps = g.playerStats.find((p: any) => p.name === name);
           return sum + (ps ? ps.rejoinCount : 0);
         }, 0);
-        const text = totalNet >= 0 ? `+₹${Math.round(totalNet)} +${totalRejoins}` : `-₹${Math.round(Math.abs(totalNet))} +${totalRejoins}`;
+        const text =
+          totalNet >= 0
+            ? `+${Math.round(totalNet)}${totalRejoins > 0 ? ` (+${totalRejoins})` : ''}`
+            : `-${Math.round(Math.abs(totalNet))}${totalRejoins > 0 ? ` (+${totalRejoins})` : ''}`;
         totalRow.push(text);
       });
       body.push(totalRow);
@@ -694,11 +700,10 @@ else {
               <button
                 onClick={joinRoom}
                 disabled={joiningCode.trim().length < 4}
-                className={`w-full py-4 font-bold text-xl rounded-xl transition ${
-                  joiningCode.trim().length >= 4
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
+                className={`w-full py-4 font-bold text-xl rounded-xl transition ${joiningCode.trim().length >= 4
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
               >
                 Join Table
               </button>
@@ -783,7 +788,7 @@ else {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-slate-500 uppercase">Pot</p>
-                      <p className="text-2xl font-bold text-emerald-600">₹{game.totalPot}</p>
+                      <p className="text-2xl font-bold text-emerald-600">{game.totalPot}</p>
                     </div>
                   </div>
 
@@ -802,14 +807,16 @@ else {
                               </span>
                             )}
                           </span>
-                          <span className="block text-xs text-slate-500">Score: {ps.score}</span>
+                          {/* <span className="block text-xs text-slate-500">Score: {ps.score}</span> */}
+                          <span className="block text-xs text-slate-500">
+                            Score: {game.isDirectWin && ps.name !== game.winnerName ? 100 : ps.score}
+                          </span>
                         </div>
                         <span
-                          className={`font-bold px-3 py-1 rounded ${
-                            ps.net >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
-                          }`}
+                          className={`font-bold px-3 py-1 rounded ${ps.net >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
+                            }`}
                         >
-                          {ps.net >= 0 ? `+₹${Math.round(ps.net)}` : `-₹${Math.round(Math.abs(ps.net))}`}
+                          {ps.net >= 0 ? `+${Math.round(ps.net)}` : `-${Math.round(Math.abs(ps.net))}`}
                         </span>
                       </div>
                     ))}
@@ -837,9 +844,9 @@ else {
                               return sum + (ps ? ps.rejoinCount : 0);
                             }, 0);
                             return (
-                          <th key={i} className="text-center py-3 px-4 font-medium">
-                            {name}
-                          </th>
+                              <th key={i} className="text-center py-3 px-4 font-medium">
+                                {name}
+                              </th>
                             );
                           })}
                         </tr>
@@ -854,8 +861,15 @@ else {
                                 const ps = game.playerStats.find((p: any) => p.name === name);
                                 const net = ps ? ps.net : 0;
                                 return (
-                                  <td key={j} className={`py-3 px-4 text-center font-bold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {net >= 0 ? `+₹${Math.round(net)} +${ps ? ps.rejoinCount : 0}` : `-₹${Math.round(Math.abs(net))} +${ps ? ps.rejoinCount : 0}`}
+                                  <td
+                                    key={j}
+                                    className={`py-3 px-4 text-center font-bold ${net >= 0 ? 'text-emerald-600' : 'text-red-600'
+                                      }`}
+                                  >
+                                    {net >= 0
+                                      ? `+${Math.round(net)}${ps?.rejoinCount ? ` (+${ps.rejoinCount})` : ''}`
+                                      : `-${Math.round(Math.abs(net))}${ps?.rejoinCount ? ` (+${ps.rejoinCount})` : ''}`
+                                    }
                                   </td>
                                 );
                               })}
@@ -874,8 +888,15 @@ else {
                               return sum + (ps ? ps.rejoinCount : 0);
                             }, 0);
                             return (
-                              <td key={j} className={`py-3 px-4 text-center font-bold ${totalNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                {totalNet >= 0 ? `+₹${Math.round(totalNet)} +${totalRejoins}` : `-₹${Math.round(Math.abs(totalNet))} +${totalRejoins}`}
+                              <td
+                                key={j}
+                                className={`py-3 px-4 text-center font-bold ${totalNet >= 0 ? 'text-emerald-600' : 'text-red-600'
+                                  }`}
+                              >
+                                {totalNet >= 0
+                                  ? `+${Math.round(totalNet)}${totalRejoins ? ` (+${totalRejoins})` : ''}`
+                                  : `-${Math.round(Math.abs(totalNet))}${totalRejoins ? ` (+${totalRejoins})` : ''}`
+                                }
                               </td>
                             );
                           })}
@@ -908,23 +929,22 @@ else {
             </h2>
             <p className="text-3xl font-bold mb-1">🏆 {finalWinnerName}</p>
             <p className="text-emerald-300 text-lg font-bold mb-6">
-              Pot: ₹{finalPotAmount}
+              Pot: {finalPotAmount}
             </p>
 
             <div className="space-y-3">
               {finalStats.map((p, i) => (
                 <div
                   key={i}
-                  className={`flex justify-between items-center p-4 rounded-lg text-sm ${
-                    p.isWinner ? 'bg-emerald-700/30' : 'bg-white/10'
-                  }`}
+                  className={`flex justify-between items-center p-4 rounded-lg text-sm ${p.isWinner ? 'bg-emerald-700/30' : 'bg-white/10'
+                    }`}
                 >
                   <div>
                     <p className="font-bold">{p.name}</p>
                     <p className="text-xs text-slate-300">Score: {p.score}</p>
                   </div>
                   <p className={`font-bold ${p.net >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                    {p.net >= 0 ? `+₹${Math.round(p.net)}` : `-₹${Math.round(Math.abs(p.net))}`}
+                    {p.net >= 0 ? `+${Math.round(p.net)}` : `-${Math.round(Math.abs(p.net))}`}
                   </p>
                 </div>
               ))}
@@ -992,7 +1012,7 @@ else {
             </div>
 
             <div>
-              <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in (₹)</p>
+              <p className="text-xs font-bold text-slate-600 uppercase mb-2">Buy-in ()</p>
               <input
                 type="number"
                 min={50}
@@ -1021,7 +1041,7 @@ else {
                 }}
                 className="w-full p-4 rounded-xl text-center text-xl font-bold bg-slate-50"
               />
-              <p className="text-xs text-slate-500 mt-1">Min ₹50, Max ₹999</p>
+              <p className="text-xs text-slate-500 mt-1">Min 50, Max 999</p>
             </div>
 
             {frequentNames.length > 0 && (
@@ -1075,11 +1095,10 @@ else {
                 await syncToDb({ gameStarted: true });
               })}
               disabled={players.length < 2}
-              className={`w-full py-4 rounded-xl font-bold text-lg ${
-                players.length < 2
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
-              }`}
+              className={`w-full py-4 rounded-xl font-bold text-lg ${players.length < 2
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
             >
               START GAME
             </button>
@@ -1107,14 +1126,14 @@ else {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-xs uppercase opacity-80">Room Code</p>
-              <p className="text-3xl font-black tracking-widest">{roomCode}</p>
+              <p className="text-2xl font-black tracking-widest">{roomCode}</p>
             </div>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(roomCode || '');
                 alert("Room code copied to clipboard!");
               }}
-              className="bg-white/20 hover:bg-white/30 px-5 py-3 rounded-lg text-sm font-medium transition"
+              className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-xs font-medium transition"
             >
               Copy Code
             </button>
@@ -1127,7 +1146,7 @@ else {
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-xs text-slate-400 uppercase">Total Pot</p>
-              <p className="text-4xl font-black text-emerald-400">₹{totalPot}</p>
+              <p className="text-4xl font-black text-emerald-400">{totalPot}</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-400 uppercase">Round #{roundsPlayed + 1}</p>
@@ -1180,9 +1199,8 @@ else {
           {players.map(player => (
             <div
               key={player.id}
-              className={`rounded-xl border border-slate-200 p-4 ${
-                player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white'
-              }`}
+              className={`rounded-xl border border-slate-200 p-4 ${player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white'
+                }`}
             >
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center gap-2">
@@ -1200,17 +1218,16 @@ else {
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-slate-600">Paid: ₹{player.totalPaid}</p>
+                <p className="text-sm font-medium text-slate-600">Paid: {player.totalPaid}</p>
 
                 {!player.isOut ? (
                   <div className="flex items-center gap-3 flex-1 justify-end">
                     <button
                       onClick={() => setWinnerId(player.id)}
-                      className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${
-                        winnerId === player.id
-                          ? 'bg-yellow-400 border-2 border-yellow-500'
-                          : 'bg-slate-100 border border-slate-300 hover:bg-slate-200'
-                      }`}
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${winnerId === player.id
+                        ? 'bg-yellow-400 border-2 border-yellow-500'
+                        : 'bg-slate-100 border border-slate-300 hover:bg-slate-200'
+                        }`}
                     >
                       🏆
                     </button>
@@ -1238,7 +1255,7 @@ else {
                     onClick={() => rejoin(player.id)}
                     className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700"
                   >
-                    Rejoin ₹{buyInAmount}
+                    Rejoin {buyInAmount}
                   </button>
                 )}
               </div>
@@ -1256,19 +1273,18 @@ else {
           <button
             onClick={submitRound}
             disabled={!winnerId}
-            className={`flex-1 py-4 rounded-xl font-bold text-lg transition-colors ${
-              winnerId
-                ? isDirectWinPossible
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-            }`}
+            className={`flex-1 py-4 rounded-xl font-bold text-lg transition-colors ${winnerId
+              ? isDirectWinPossible
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              }`}
           >
             {isEditingLastRound
               ? "SAVE CORRECTION"
               : isDirectWinPossible
-              ? "DECLARE WINNER & FINISH"
-              : "SUBMIT ROUND"}
+                ? "DECLARE WINNER & FINISH"
+                : "SUBMIT ROUND"}
           </button>
 
           {roundsPlayed >= 1 && (
