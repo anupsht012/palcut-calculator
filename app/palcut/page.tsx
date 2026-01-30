@@ -403,20 +403,20 @@ const PalCutGame = () => {
 
       if (isDirectWin && directWinnerId) {
         const winner = players.find(p => p.id === directWinnerId)!;
-const isDirectEliminated = !isWinner && p.isOut && p.cumulativeScore === 100; // or just check !isWinner && was active
         payoutDescription = `Direct win – ${winner.name} takes full pot (entry not refunded)`;
         winnerDisplay = winner.name;
 
         stats = players.map(p => {
           const isWinner = p.id === directWinnerId;
+          const isDirectEliminated = !isWinner && p.isOut && p.cumulativeScore === 100; // or just check !isWinner && was active
 
           return {
             name: p.name,
-            score: isWinner 
-        ? p.cumulativeScore                          // real score for winner
-        : isDirectEliminated 
-          ? 100                                      // force 100 for direct-win losers
-          : p.cumulativeScore,
+            score: isWinner
+              ? p.cumulativeScore                          // real score for winner
+              : isDirectEliminated
+                ? 100                                      // force 100 for direct-win losers
+                : p.cumulativeScore,
             paid: p.totalPaid,
             net: isWinner
               ? Math.round(totalPot - p.totalPaid)
