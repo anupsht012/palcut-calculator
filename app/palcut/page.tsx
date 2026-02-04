@@ -387,7 +387,7 @@ const PalCutGame = () => {
             added = 0;
           } else {
             added = parseInt(roundScores[p.id] || '0', 10) || 0;
-            if (multiplier === 'Dedi') added = Math.round(added * 1.5);
+            if (multiplier === 'Dedi') added = Math.floor(added * 1.5);
             if (multiplier === 'Double') added *= 2;
             if (multiplier === 'Chaubar') added *= 4;
           }
@@ -1168,14 +1168,14 @@ const PalCutGame = () => {
 
             {frequentNames.length > 0 && (
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Recent Players</p>
+                <p className="text-xs font-bold text-slate-900 uppercase mb-2">Recent Players</p>
                 <div className="flex flex-wrap gap-2">
                   {frequentNames.map(name => (
                     <div
                       key={name}
                       className="flex items-center bg-slate-100 rounded-full px-4 py-1.5 text-sm gap-2"
                     >
-                      <button onClick={() => addPlayer(name)} className="font-medium">
+                      <button onClick={() => addPlayer(name)} className="font-medium text-slate-900">
                         + {name}
                       </button>
                       <button
