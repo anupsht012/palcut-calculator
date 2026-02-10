@@ -9,6 +9,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
     return (
         <div className="h-screen bg-slate-50 flex flex-col">
             {/* ─── Header / Navigation Bar ─── */}
+            
             <header
                 className="text-white px-5 py-4 flex items-center justify-between sticky top-0 z-20 shadow-md"
                 style={{ backgroundColor: "#047857" }}
