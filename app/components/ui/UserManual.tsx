@@ -7,7 +7,7 @@ interface UserManualProps {
 
 const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
     return (
-        <div className="h-screen bg-slate-50 flex flex-col">
+        <div className="overflow-y-auto bg-slate-50 flex flex-col">
             {/* ─── Header / Navigation Bar ─── */}
             
             <header
@@ -21,7 +21,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
                     ← Back
                 </button>
                 <h1 className="text-xl font-bold">Palcut User Manual</h1>
-                <div className="w-10" /> {/* spacer */}
+                <div className="w-10" />
             </header>
 
 

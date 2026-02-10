@@ -766,7 +766,7 @@ const PalCutGame = () => {
 
   if (!authReady || !roomCode) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 space-y-8 relative">
           <div className="absolute top-5 right-5">
             <button
@@ -775,7 +775,7 @@ const PalCutGame = () => {
               style={{ width: '20px', height: '20px', borderRadius: '50%' }}
               aria-label="Help"
             >
-              <span className="text-md font-bold select-none">i</span>
+              <span className="text-md font-bold select-none">?</span>
             </button>
 
           </div>
@@ -784,10 +784,15 @@ const PalCutGame = () => {
             <p className="mt-2 text-lg text-slate-600">Score Calculator for Friends</p>
             <p className="mt-1 text-sm text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
           </div>
-          {/* {showManual && <UserManual onClose={() => setShowManual(false)} />} */}
+          {/* {showManual && 
+          <div className='h-[40vh]'>
+
+          <UserManual onClose={() => setShowManual(false)} />
+          </div>
+          } */}
           {showManual && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-              <div className="w-full max-w-4xl h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+              <div className="w-full max-w-sm  h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col">
                 <UserManual onClose={() => setShowManual(false)} />
               </div>
             </div>
