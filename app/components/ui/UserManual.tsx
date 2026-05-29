@@ -183,7 +183,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
                                 <ul className="list-disc pl-6 space-y-2">
                                     <li>Players who lose get positive points (example: 30).</li>
                                     <li>Winner usually gets 0 points.</li>
-                                    <li>The app automatically totals scores.</li>
+                                    <li>The app automatically totals points.</li>
                                 </ul>
                             </div>
 
@@ -196,7 +196,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
                                     <strong>100</strong> or more.
                                 </p>
                                 <div className="bg-slate-50 border rounded-xl p-4 text-sm">
-                                    The app shows who is knocked out and prevents further score
+                                    The app shows who is knocked out and prevents further points
                                     entry for eliminated players.
                                 </div>
                             </div>
@@ -330,7 +330,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
 
                             <div className="bg-white rounded-2xl shadow-sm border p-6">
                                 <h3 className="text-xl font-bold text-slate-900 mb-3">
-                                    Scores Entered Wrong
+                                    Points Entered Wrong
                                 </h3>
                                 <ul className="list-disc pl-6 space-y-2">
                                     <li>Use the “Delete Round” option (if available).</li>
@@ -343,8 +343,8 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
                                     Best Practices
                                 </h3>
                                 <ul className="list-disc pl-6 space-y-2">
-                                    <li>Keep one person as “host” for clean score entry.</li>
-                                    <li>Always confirm round scores before saving.</li>
+                                    <li>Keep one person as “host” for clean point entry.</li>
+                                    <li>Always confirm round points before saving.</li>
                                     <li>Download PDF at the end for permanent record.</li>
                                 </ul>
                             </div>

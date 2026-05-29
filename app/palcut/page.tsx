@@ -781,7 +781,7 @@ const PalCutGame = () => {
           </div>
           <div className="text-center">
             <h1 className="text-4xl font-extrabold text-slate-800">Palcut</h1>
-            <p className="mt-2 text-lg text-slate-600">Score Calculator for Friends</p>
+            <p className="mt-2 text-lg text-slate-600">Real-Time Table Score Calculator</p>
             <p className="mt-1 text-sm text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
           </div>
           {/* {showManual && 
