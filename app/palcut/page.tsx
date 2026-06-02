@@ -780,9 +780,9 @@ const PalCutGame = () => {
 
           </div>
           <div className="text-center">
-            <h1 className="text-4xl font-extrabold text-slate-800">Palcut</h1>
-            <p className="mt-2 text-lg text-slate-600">Real-Time Table Score Calculator</p>
-            <p className="mt-1 text-sm text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
+            <h1 className="text-4xl font-extrabold text-slate-800">Palcut Game Calculator</h1>
+            <p className="mt-2 text-md text-slate-600">Realtime Table Score Calculator</p>
+            <p className="mt-1 text-xs text-emerald-600 font-medium">Multiple tables can play simultaneously</p>
           </div>
           {/* {showManual && 
           <div className='h-[40vh]'>
@@ -809,7 +809,7 @@ const PalCutGame = () => {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-300" />
               </div>
-              <div className="relative flex justify-center text-sm">
+              <div className="relative flex justify-center text-xs">
                 <span className="px-4 bg-white text-slate-500">or join existing table</span>
               </div>
             </div>
@@ -861,19 +861,19 @@ const PalCutGame = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 bg-slate-50 z-10 pt-2 pb-4 border-b">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Game History</h2>
-              <p className="text-sm text-slate-600">Room: <span className="font-mono font-bold">{roomCode}</span></p>
+              <p className="text-xs text-slate-600">Room: <span className="font-mono font-bold">{roomCode}</span></p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setView('game')}
-                className="bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-700"
+                className="bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-xs hover:bg-slate-700"
               >
                 Back to Game
               </button>
               {history.length > 0 && (
                 <button
                   onClick={downloadHistoryPDF}
-                  className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium text-sm hover:bg-green-700"
+                  className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium text-xs hover:bg-green-700"
                 >
                   Download PDF
                 </button>
@@ -919,7 +919,7 @@ const PalCutGame = () => {
                           ×
                         </button>
                       </div>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500 mt-1">
                         {game.timestamp?.toDate?.()?.toLocaleString() || '—'}
                       </p>
                     </div>
@@ -933,7 +933,7 @@ const PalCutGame = () => {
                     {game.playerStats?.map((ps: any, i: number) => (
                       <div
                         key={i}
-                        className="flex justify-between items-center bg-slate-50 p-3 rounded-lg text-sm"
+                        className="flex justify-between items-center bg-slate-50 p-3 rounded-lg text-xs"
                       >
                         <div>
                           <span className="text-slate-900 font-medium">
@@ -962,16 +962,16 @@ const PalCutGame = () => {
               ))}
               {history.length > 0 && (
                 <div className="mt-10 bg-white rounded-xl shadow-sm p-5">
-                  <h3 className="font-semibold text-slate-900 text-lg mb-1 flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 text-md mb-1 flex items-center gap-2">
                     Overall Profit / Loss
                     <span className="text-xs font-normal text-slate-500">(This Room)</span>
                   </h3>
-                  <p className="text-sm text-slate-600 mb-4">
+                  <p className="text-xs text-slate-600 mb-4">
                     📅 {history[0]?.timestamp?.toDate?.()?.toLocaleDateString() || 'Unknown'}
                   </p>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm border-collapse">
+                    <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
                           <th className="text-left py-3 px-4 font-medium text-slate-900">Game</th>
@@ -1076,7 +1076,7 @@ const PalCutGame = () => {
               {finalPayoutDescription}
             </h2>
             <p className="text-3xl font-bold mb-1">🏆 {finalWinnerName}</p>
-            <p className="text-emerald-300 text-lg font-bold mb-6">
+            <p className="text-emerald-300 text-md font-bold mb-6">
               Pot: {finalPotAmount}
             </p>
 
@@ -1084,7 +1084,7 @@ const PalCutGame = () => {
               {finalStats.map((p, i) => (
                 <div
                   key={i}
-                  className={`flex justify-between items-center p-4 rounded-lg text-sm ${p.isWinner ? 'bg-emerald-700/30' : 'bg-white/10'
+                  className={`flex justify-between items-center p-4 rounded-lg text-xs ${p.isWinner ? 'bg-emerald-700/30' : 'bg-white/10'
                     }`}
                 >
                   <div>
@@ -1101,7 +1101,7 @@ const PalCutGame = () => {
 
           <button
             onClick={handleStartNewGame}
-            className="w-full py-5 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700"
+            className="w-full py-5 bg-indigo-600 text-white rounded-xl font-bold text-md hover:bg-indigo-700"
           >
             Start New Game
           </button>
@@ -1131,8 +1131,8 @@ const PalCutGame = () => {
           <div className="bg-white rounded-xl shadow p-6 space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Palcut Calculator</h2>
-                <p className="text-sm font-medium text-emerald-600">Room: {roomCode}</p>
+                <h2 className="text-md font-bold text-slate-800">Palcut Calculator</h2>
+                <p className="text-xs font-medium text-emerald-600">Room: {roomCode}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1150,13 +1150,13 @@ const PalCutGame = () => {
                     });
 
                   }}
-                  className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100"
+                  className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-red-100"
                 >
                   Change Room
                 </button>
                 <button
                   onClick={fetchHistory}
-                  className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100"
+                  className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-indigo-100"
                 >
                   History
                 </button>
@@ -1218,7 +1218,7 @@ const PalCutGame = () => {
                   {frequentNames.map(name => (
                     <div
                       key={name}
-                      className="flex items-center bg-slate-100 rounded-full px-4 py-1.5 text-sm gap-2"
+                      className="flex items-center bg-slate-100 rounded-full px-4 py-1.5 text-xs gap-2"
                     >
                       <button onClick={() => addPlayer(name)} className="font-medium text-slate-900">
                         + {name}
@@ -1245,10 +1245,10 @@ const PalCutGame = () => {
               )}
               {players.map(p => (
                 <div key={p.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
-                  <span className=" font-bold text-lg text-slate-900">{p.name}</span>
+                  <span className=" font-bold text-md text-slate-900">{p.name}</span>
                   <button
                     onClick={() => removePlayer(p.id)}
-                    className="text-red-500 text-sm font-medium"
+                    className="text-red-500 text-xs font-medium"
                   >
                     Remove
                   </button>
@@ -1262,7 +1262,7 @@ const PalCutGame = () => {
                 await syncToDb({ gameStarted: true });
               })}
               disabled={players.length < 2}
-              className={`w-full py-4 rounded-xl font-bold text-lg ${players.length < 2
+              className={`w-full py-4 rounded-xl font-bold text-md ${players.length < 2
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
                 }`}
@@ -1334,12 +1334,12 @@ const PalCutGame = () => {
               <p className="text-4xl font-black text-emerald-400">{totalPot}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-400 uppercase">Round #{roundsPlayed + 1}</p>
-              <p className="text-lg font-bold text-indigo-300">{multiplier}</p>
+              <p className="text-xs text-slate-400 uppercase">Round {roundsPlayed + 1}</p>
+              <p className="text-md font-bold text-indigo-300">{multiplier}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-white/10 p-3 rounded-lg">
               <p className="text-xs text-slate-300 uppercase">Leader</p>
               <p className="font-bold truncate">{rankedPlayers[0]?.name || '-'}</p>
@@ -1347,20 +1347,20 @@ const PalCutGame = () => {
             <div className="bg-white/10 p-3 rounded-lg">
               <p className="text-xs text-slate-300 uppercase">Active Players</p>
               <p className="font-bold text-emerald-400">
-                {players.filter(p => !p.isOut).length} / {players.length}
+                {players?.filter(p => !p?.isOut)?.length} / {players?.length}
               </p>
             </div>
           </div>
         </div>
 
         {/* Multiplier Selector */}
-        <div className="flex bg-slate-100/80 backdrop-blur-sm p-1 rounded-xl gap-1 border border-slate-200">
+        <div className="flex bg-slate-100/80 backdrop-blur-sm  rounded-xl gap-1 border-slate-200">
           {(['Normal', 'Dedi', 'Double', 'Chaubar'] as Multiplier[]).map(m => (
             <button
               key={m}
               onClick={() => setMultiplier(m)}
               className={`
-                flex-1 py-3 sm:py-3.5 rounded-lg font-medium text-sm transition-all duration-200
+                flex-1 py-3 sm:py-3.5 rounded-lg font-medium text-xs transition-all duration-200
                 ${multiplier === m
                   ? 'bg-white text-indigo-700 shadow-md scale-[1.05]'
                   : 'text-slate-600 hover:text-slate-800 hover:bg-white/60'
@@ -1374,17 +1374,17 @@ const PalCutGame = () => {
 
         {/* Direct win hint */}
         {isDirectWinPossible && (
-          <div className="bg-amber-50 border border-amber-300 text-amber-800 p-3 rounded-xl text-center text-sm">
+          <div className="bg-amber-50 border border-amber-300 text-amber-800 p-3 rounded-xl text-center text-xs">
             All others have 0 points → winner takes full pot (entry not refunded)
           </div>
         )}
 
         {/* Players List */}
         <div className="space-y-4">
-          {players.map(player => (
+          {players?.map(player => (
             <div
               key={player.id}
-              className={`rounded-xl border border-slate-200 p-4 ${player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white'
+              className={`rounded-xl border border-slate-200 p-3 ${player.isOut ? 'bg-red-50 border-red-200 opacity-75' : 'bg-white'
                 }`}
             >
               <div className="flex justify-between items-center mb-3">
@@ -1403,7 +1403,7 @@ const PalCutGame = () => {
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-slate-600">Paid: {player.totalPaid}</p>
+                <p className="text-xs font-medium text-slate-600">Paid: {player.totalPaid}</p>
 
                 {!player.isOut ? (
                   <div className="flex items-center gap-3 flex-1 justify-end">
@@ -1432,7 +1432,7 @@ const PalCutGame = () => {
                     />
                   </div>
                 ) : player.canNoLongerRejoin ? (
-                  <div className="flex-1 bg-slate-200 text-slate-600 py-3 rounded-lg text-center text-sm font-medium">
+                  <div className="flex-1 bg-slate-200 text-slate-600 py-3 rounded-lg text-center text-xs font-medium">
                     Eliminated
                   </div>
                 ) : (
@@ -1449,7 +1449,7 @@ const PalCutGame = () => {
         </div>
 
         {isEditingLastRound && (
-          <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-center text-sm">
+          <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-center text-xs">
             ⚠️ Editing last round — save when ready
           </div>
         )}
@@ -1458,7 +1458,7 @@ const PalCutGame = () => {
           <button
             onClick={submitRound}
             disabled={!winnerId}
-            className={`flex-1 py-4 rounded-xl font-bold text-lg transition-colors ${winnerId
+            className={`flex-1 py-4 rounded-xl font-bold text-md transition-colors ${winnerId
               ? isDirectWinPossible
                 ? 'bg-green-600 hover:bg-green-700 text-white'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -1485,7 +1485,7 @@ const PalCutGame = () => {
         {roundsPlayed >= 1 && !isEditingLastRound && previousPlayers && (
           <button
             onClick={startCorrectLastRound}
-            className="w-full py-3 mt-2 text-sm font-medium text-orange-600 hover:text-orange-800 bg-orange-50 rounded-xl border border-orange-200 transition-colors"
+            className="w-full py-3 mt-2 text-xs font-medium text-orange-600 hover:text-orange-800 bg-orange-50 rounded-xl border border-orange-200 transition-colors"
           >
             ✏️ Correct Last Round
           </button>
@@ -1493,7 +1493,7 @@ const PalCutGame = () => {
 
         <button
           onClick={resetLiveGame}
-          className="w-full py-3 text-sm text-slate-500 hover:text-red-600 font-medium"
+          className="w-full py-3 text-xs text-slate-500 hover:text-red-600 font-medium"
         >
           Emergency Reset
         </button>
