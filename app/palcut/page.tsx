@@ -293,7 +293,7 @@ const PalCutGame = () => {
 
   const addPlayer = async (nameOverride?: string) => {
     const nameToUse = (nameOverride || newName).trim();
-    if (!nameToUse || players.length >= 6) return;
+    if (!nameToUse || players.length >= 7) return;
     if (players.find(p => p.name.toLowerCase() === nameToUse.toLowerCase())) return;
 
     const newPlayer: Player = {
