@@ -43,7 +43,7 @@ const UserManual: React.FC<UserManualProps> = ({ onClose }) => {
                                 This web app helps groups of friends track scores, manage buy-ins,
                                 and handle payouts for the card game{" "}
                                 <strong>Palcut</strong> — a points-based elimination game played
-                                with 4–6 players.
+                                with 4–7 players.
                             </p>
 
                             <p className="mb-4">
