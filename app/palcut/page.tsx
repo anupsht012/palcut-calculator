@@ -1417,7 +1417,8 @@ const PalCutGame = () => {
                       🏆
                     </button>
                     <input
-                      type="number"
+                      // type="number"
+                      type="text" inputMode="numeric" pattern="[0-9]*"
                       min="0"
                       disabled={winnerId === player.id}
                       value={winnerId === player.id ? '0' : roundScores[player.id] || ''}
